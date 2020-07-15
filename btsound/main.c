@@ -25,6 +25,7 @@
 
 /* Application header */
 #include "app.h"
+#include "pdm_stereo_ldma.h"
 
 /***********************************************************************************************//**
  * @addtogroup Application

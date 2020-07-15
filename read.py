@@ -5,6 +5,8 @@ import platform
 import matplotlib.pyplot as plt
 import numpy as np
 
+plt.style.use('dark_background')
+
 def tprint(*args, **kwargs):
     stamp = str(datetime.now())
     print("[" + stamp + "]", *args)
@@ -38,13 +40,15 @@ s.stopbits = serial.STOPBITS_ONE
 
 larr = np.zeros(1024)
 rarr = np.zeros(1024)
-n = np.arange(0, 1024, 1)
+# fsamp = (19e6 / (32*6))
+n = np.linspace(0, 10, 1024)
+# 19MHz / (32 * 6) =
 
 plt.ion()
 fig, ax = plt.subplots()
 lineL, lineR = ax.plot(n, larr, 'r-', n, rarr, 'b-')
-ax.set_xlabel("Sample Number")
-ax.set_ylabel("Sample Value")
+ax.set_xlabel("Time (mS)")
+ax.set_ylabel("Amplitude")
 ax.set_ylim(-200, 200)
 ax.set_title("PDM Microphone Data")
 fig.canvas.draw()

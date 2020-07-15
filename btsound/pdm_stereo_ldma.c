@@ -88,6 +88,11 @@ void initLdma(void)
   LDMA_StartTransfer(LDMA_CHANNEL, (void*)&periTransferTx, (void*)&descLink);
 }
 
+void stopLdma(void)
+{
+	LDMA_StopTransfer(LDMA_CHANNEL);
+}
+
 /***************************************************************************//**
  * @brief
  *   LDMA IRQ handler.

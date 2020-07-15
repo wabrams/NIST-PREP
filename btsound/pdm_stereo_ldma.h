@@ -23,6 +23,7 @@
 
 void initPdm(void);
 void initLdma(void);
+void stopLdma(void);
 void pdmPass(void);
 void pdmReset(void);
 int pdmDone(void);

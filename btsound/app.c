@@ -45,7 +45,19 @@ void appMain(gecko_configuration_t *pconfig)
 		{
 			int c = evt->data.evt_gatt_server_attribute_value.value.data[0]; //gets value
 			printLog("new rw value %c\r\n", c);
-			// Do something here.
+			if (c == 't') //t is for transmit
+			{
+				initLdma();
+				pdmReset();
+				while (!pdmDone())
+				{
+					EMU_EnterEM1();
+					pdmPass();
+				}
+				pdmPrintLeft();
+				pdmPrintRight();
+				stopLdma();
+			}
 		}
 		break;
 
@@ -72,7 +84,7 @@ void appMain(gecko_configuration_t *pconfig)
     	printLog("default\r\n");
         break;
     }
-
+// Infinite Loop
     char ch = 'r';
     while (1)
     {
