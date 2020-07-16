@@ -18,7 +18,7 @@
 // DMA channel used for the example
 #define LDMA_CHANNEL        0
 #define LDMA_CH_MASK        (1 << LDMA_CHANNEL)
-#define BUFFER_SIZE         1024
+#define BUFFER_SIZE         2048
 #define PP_BUFFER_SIZE      128 //TODO: 64 or 128?
 
 void initPdm(void);

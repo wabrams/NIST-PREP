@@ -84,8 +84,9 @@ void appMain(gecko_configuration_t *pconfig)
     	printLog("default\r\n");
         break;
     }
+    printLog("ready\r\n"); flushLog();
 // Infinite Loop
-    char ch = 'r';
+    char ch = 'c'; //for infinite, auto, replace this with 'r'
     while (1)
     {
     	if (ch == 'r')
