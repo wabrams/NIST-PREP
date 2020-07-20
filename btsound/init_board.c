@@ -35,6 +35,7 @@
 
 void initBoard(void)
 {
+
   // Enable clock for BURTC
   CMU_ClockEnable(cmuClock_BURTC, true);
 #if ((HAL_VCOM_ENABLE == 1) \
@@ -74,9 +75,9 @@ void initBoard(void)
   MX25_DP();
   // We must disable SPI communication
   MX25_deinit();
+
 }
 
 void initVcomEnable(void)
 {
-	//TODO: should this be empty? -W
 }
