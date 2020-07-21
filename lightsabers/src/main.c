@@ -6,13 +6,11 @@
 #include "em_timer.h"
 
 #define TIMER_PRESCALE  timerPrescale2
+#define TIMER_CHANNEL 		 		 1
 #define TONE_FREQ       		  3500
 
-#define PWM_TIMER 				TIMER1
-#define PWM_CHANNEL 		 		 1
-
 uint32_t max_frequency;
-uint32_t i = 0;
+uint32_t pwm_duty;
 
 uint32_t top_value(uint32_t frequency)
 {
@@ -39,7 +37,7 @@ void initCMU()
 {
 	CMU_ClockEnable(cmuClock_GPIO, true);
 	CMU_ClockEnable(cmuClock_TIMER0, true);
-//	CMU_ClockEnable(cmuClock_TIMER1, true);
+	CMU_ClockEnable(cmuClock_TIMER1, true);
 
 	// Calculate the max frequency supported by this program
 	uint32_t timer_freq = CMU_ClockFreqGet(cmuClock_TIMER3);
@@ -56,13 +54,32 @@ void initGPIO()
 
 void initTIMER()
 {
-    TIMER_Init_TypeDef timerInit = TIMER_INIT_DEFAULT;
-		timerInit.prescale = TIMER_PRESCALE;
-    TIMER_Init(TIMER0, &timerInit);
+    TIMER_Init_TypeDef timer0Init = TIMER_INIT_DEFAULT;
+		timer0Init.prescale = TIMER_PRESCALE;
+    TIMER_Init(TIMER0, &timer0Init);
     TIMER0 -> TOP = top_value(TONE_FREQ);
     TIMER0 -> IEN = TIMER_IEN_OF;
-
     NVIC_EnableIRQ(TIMER0_IRQn);
+
+    TIMER_Init_TypeDef timer1Init = TIMER_INIT_DEFAULT;
+    	timer1Init.prescale = TIMER_PRESCALE;
+    	timer1Init.enable = false;
+    TIMER_InitCC_TypeDef timer1CCInit = TIMER_INITCC_DEFAULT;
+    	timer1CCInit.mode = timerCCModeCompare;
+    	timer1CCInit.cmoa = timerOutputActionToggle;
+    TIMER_Init(TIMER1, &timer1Init);
+    GPIO -> TIMERROUTE[1].ROUTEEN = GPIO_TIMER_ROUTEEN_CC0PEN;
+    GPIO -> TIMERROUTE[1].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT)
+  		  						     | (3 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
+    TIMER_InitCC(TIMER1, 0, &timer1CCInit);
+
+    uint32_t freq = 1000;
+    uint32_t timerFreq = CMU_ClockFreqGet(cmuClock_TIMER1)/(timer1Init.prescale + 1);
+    int topValue = timerFreq / (2*freq) - 1;
+    TIMER_TopSet(TIMER1, topValue);
+
+    TIMER_Enable(TIMER0, true);
+    TIMER_Enable(TIMER1, true);
 }
 
 int main(void)
@@ -73,25 +90,29 @@ int main(void)
 	initGPIO();
 	initTIMER();
 
-	i = 0;
+	__enable_irq();
+
 	while (1)
 	{
-		i += 1;
-//		EMU_EnterEM1();
+		EMU_EnterEM1();
 	}
 }
 
 void TIMER0_IRQHandler(void)
 {
+	__disable_irq();
+
     // Clear the interrupt
-    TIMER_IntClear(TIMER0, TIMER_IF_OF);
+	TIMER0 -> IF_CLR = TIMER0 -> IF;
 
     // This is for debug viewing on a scope
     GPIO_PinOutToggle(gpioPortB, 0);
 
     // Get the next sine value
-    uint32_t pwm_duty = sine_wave_generator();
+    pwm_duty = sine_wave_generator();
 
     // Set the new duty cycle for this sample based on the generator
-    TIMER_CompareBufSet(PWM_TIMER, PWM_CHANNEL, pwm_duty);
+//    TIMER_CompareBufSet(TIMER1, 0, pwm_duty);
+
+	__enable_irq();
 }
