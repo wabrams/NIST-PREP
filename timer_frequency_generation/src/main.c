@@ -75,6 +75,7 @@ void initTIMER(void)
   GPIO -> TIMERROUTE[0].CC1ROUTE = (gpioPortD << _GPIO_TIMER_CC1ROUTE_PORT_SHIFT)
   		  								  | (2 << _GPIO_TIMER_CC1ROUTE_PIN_SHIFT);
   TIMER_InitCC(TIMER0, 0, &timerCCInit);
+  	  timerCCInit.outInvert = true;
   TIMER_InitCC(TIMER0, 1, &timerCCInit);
 
   // Set Top value
