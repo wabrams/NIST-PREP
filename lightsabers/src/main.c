@@ -11,6 +11,7 @@
 
 uint32_t max_frequency;
 uint32_t pwm_duty;
+uint8_t count = 0;
 
 uint32_t top_value(uint32_t frequency)
 {
@@ -22,7 +23,6 @@ uint32_t top_value(uint32_t frequency)
 uint32_t sine_wave_generator()
 {
   const uint8_t lookup_table[10] = {5,8,10,10,8,5,2,0,0,2};
-  static uint8_t count = 0;
 
   // Lookup the value
   uint32_t result = lookup_table[count];
@@ -65,18 +65,16 @@ void initTIMER()
     	timer1Init.prescale = TIMER_PRESCALE;
     	timer1Init.enable = false;
     TIMER_InitCC_TypeDef timer1CCInit = TIMER_INITCC_DEFAULT;
-    	timer1CCInit.mode = timerCCModeCompare;
-    	timer1CCInit.cmoa = timerOutputActionToggle;
+    	timer1CCInit.mode  = timerCCModeCompare;
+    	timer1CCInit.cmoa  = timerOutputActionClear;
+    	timer1CCInit.cofoa = timerOutputActionSet;
     TIMER_Init(TIMER1, &timer1Init);
     GPIO -> TIMERROUTE[1].ROUTEEN = GPIO_TIMER_ROUTEEN_CC0PEN;
     GPIO -> TIMERROUTE[1].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT)
   		  						     | (3 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
     TIMER_InitCC(TIMER1, 0, &timer1CCInit);
 
-    uint32_t freq = 1000;
-    uint32_t timerFreq = CMU_ClockFreqGet(cmuClock_TIMER1)/(timer1Init.prescale + 1);
-    int topValue = timerFreq / (2*freq) - 1;
-    TIMER_TopSet(TIMER1, topValue);
+    TIMER_TopSet(TIMER1, top_value(TONE_FREQ) / 10);
 
     TIMER_Enable(TIMER0, true);
     TIMER_Enable(TIMER1, true);
@@ -112,7 +110,7 @@ void TIMER0_IRQHandler(void)
     pwm_duty = sine_wave_generator();
 
     // Set the new duty cycle for this sample based on the generator
-//    TIMER_CompareBufSet(TIMER1, 0, pwm_duty);
+    TIMER_CompareBufSet(TIMER1, 0, pwm_duty);
 
 	__enable_irq();
 }
