@@ -8,6 +8,14 @@ btsound/.cproject
 btsound/.project
 BRD4184A_EFR32BG22_pdm_stereo_ldma/
 .ipynb_checkpoints/
+squarewave_burst_generation/.settings
+squarewave_burst_generation/app
+squarewave_burst_generation/hardware
+squarewave_burst_generation/platform
+squarewave_burst_generation/protocol
+squarewave_burst_generation/GNU ARM v7.2.1 - debug
+squarewave_burst_generation/.cproject
+squarewave_burst_generation/.project
 lightsabers/.settings
 lightsabers/app
 lightsabers/hardware
@@ -16,3 +24,11 @@ lightsabers/protocol
 lightsabers/GNU ARM v7.2.1 - debug
 lightsabers/.cproject
 lightsabers/.project
+timer_frequency_generation/.settings
+timer_frequency_generation/app
+timer_frequency_generation/hardware
+timer_frequency_generation/platform
+timer_frequency_generation/protocol
+timer_frequency_generation/.cproject
+timer_frequency_generation/.project
+timer_frequency_generation/GNU ARM v7.2.1 - debug/

@@ -1669,13 +1669,13 @@ OUTPUT(timer_frequency_generation.axf elf32-littlearm)
  .comment       0x0000007e       0x7f ./emlib/em_timer.o
  .comment       0x0000007e       0x7f ./src/main.o
 
-.debug_line     0x00000000     0x3a64
+.debug_line     0x00000000     0x3a66
  .debug_line    0x00000000       0xd7 ./CMSIS/EFR32BG22/startup_efr32bg22.o
  .debug_line    0x000000d7      0x93f ./CMSIS/EFR32BG22/system_efr32bg22.o
  .debug_line    0x00000a16     0x124e ./emlib/em_cmu.o
  .debug_line    0x00001c64      0x9a7 ./emlib/em_gpio.o
  .debug_line    0x0000260b      0xb1b ./emlib/em_timer.o
- .debug_line    0x00003126      0x93e ./src/main.o
+ .debug_line    0x00003126      0x940 ./src/main.o
 
 .debug_info     0x00000000     0xf383
  .debug_info    0x00000000       0x26 ./CMSIS/EFR32BG22/startup_efr32bg22.o

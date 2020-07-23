@@ -49,39 +49,40 @@ fig, ax = plt.subplots()
 lineL, lineR = ax.plot(n, larr, 'r-', n, rarr, 'b-')
 ax.set_xlabel("Time (mS)")
 ax.set_ylabel("Amplitude")
-ax.set_ylim(-200, 200)
+ax.set_ylim(-10000, 10000)
 ax.set_title("PDM Microphone Data")
 fig.canvas.draw()
 
+tprint("Entering Infinite Loop")
+
+
 while True:
-    res = s.readline()
-    try:
-        res = res.decode().strip()
-    except (UnicodeDecodeError, AttributeError):
-        pass
-    tprint(res)
-    # fetch new data
-    if res == "done:":
-        larr_raw = []
-        rarr_raw = []
-        s.write(b"r")
-        res = s.readline().decode().strip()
-        if res == "left:":
-            larr_raw = s.readline().decode().strip().split(" ") # tprint(larr_raw)
-        else:
-            # todo: throw error / warning
-            tprint("not left!")
-        res = s.readline().decode().strip()
-        if res == "right:":
-            rarr_raw = s.readline().decode().strip().split(" ") # tprint(rarr_raw)
-        else:
-            tprint("not right!")
+    s.write(b"r")
 
-        larr = np.array(list(map(int, larr_raw)))
-        rarr = np.array(list(map(int, rarr_raw)))
+    larr_raw = []
+    rarr_raw = []
 
-        lineL.set_ydata(larr)
-        lineR.set_ydata(rarr)
-        fig.canvas.draw()
-        fig.canvas.flush_events()
+    res = s.readline().decode().strip()
+    if res == "left":
+        larr_raw = s.readline().decode().strip().split(" ") # tprint(larr_raw)
+    else:
+        # todo: throw error / warning
+        tprint("not left!")
+
+    res = s.readline().decode().strip()
+    if res == "right":
+        rarr_raw = s.readline().decode().strip().split(" ") # tprint(rarr_raw)
+    else:
+        tprint("not right!")
+
+    larr = np.array(list(map(int, larr_raw)))
+    rarr = np.array(list(map(int, rarr_raw)))
+
+    lineL.set_ydata(larr)
+    lineR.set_ydata(rarr)
+
+    # tprint(len(larr), len(rarr), len(n))
+
+    fig.canvas.draw()
+    fig.canvas.flush_events()
     plt.pause(0.01)
