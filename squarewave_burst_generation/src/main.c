@@ -45,6 +45,8 @@ void initTIMER(void)
 	  timer0Init.prescale = timerPrescale1;
 	  timer0Init.enable   = false;
 	  timer0Init.debugRun = false;
+	  //TODO: we want to turn the timer off on falling edges...
+//	  timer0Init.fallAction = timerInputActionStop;
   TIMER_Init(TIMER0, &timer0Init);
 
   TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
@@ -61,8 +63,8 @@ void initTIMER(void)
 	  timer1Init.prescale = timer0Init.prescale;
 	  timer1Init.enable   = false;
 	  timer1Init.debugRun = false;
-	  timer1Init.riseAction = timerInputActionStop;
-	  timer1Init.fallAction = timerInputActionReloadStart;
+	  timer1Init.riseAction = timerInputActionReloadStart;
+	  timer1Init.fallAction = timerInputActionStop;
   TIMER_Init(TIMER1, &timer1Init);
 
   TIMER_InitCC_TypeDef timer1CC1Init = TIMER_INITCC_DEFAULT;
