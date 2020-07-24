@@ -5,6 +5,8 @@
 #include "em_gpio.h"
 #include "em_timer.h"
 
+#define SINGLE_SHOT 1
+
 /*
  * TIMER0 is the heartbeat
  * TIMER0 outputs onto CC0
@@ -15,7 +17,7 @@
 
 uint32_t square_freq = 2000;
 uint32_t chirp_freq = 50;
-uint32_t max_freq;
+uint32_t max_freq; //TODO: will no longer be global now that development is complete
 
 void initCMU(void)
 {
@@ -45,8 +47,9 @@ void initTIMER(void)
 	  timer0Init.prescale = timerPrescale1;
 	  timer0Init.enable   = false;
 	  timer0Init.debugRun = false;
-	  //TODO: we want to turn the timer off on falling edges...
-//	  timer0Init.fallAction = timerInputActionStop;
+#if SINGLE_SHOT
+	  timer0Init.fallAction = timerInputActionStop;
+#endif
   TIMER_Init(TIMER0, &timer0Init);
 
   TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
@@ -83,14 +86,16 @@ void initTIMER(void)
 
 int main(void)
 {
-  CHIP_Init();
   // Initialize Hardware
+  CHIP_Init();
   initCMU();
   initGPIO();
   initTIMER();
+
   // Start Timers
   TIMER_Enable(TIMER0, true);
-  TIMER_Enable(TIMER1, true);
+  // we don't need to enable TIMER1, as TIMER0 will be enabling and disabling it
+
   // Infinite Loop
   while (1)
   {
