@@ -13,7 +13,7 @@ bool prevBufferPing;
  * @brief
  *   Sets up PDM microphones
  ******************************************************************************/
-void initPdm(void)
+void initPDM(void)
 {
   // Set up clocks
   CMU_ClockEnable(cmuClock_GPIO, true);
@@ -64,7 +64,7 @@ void initPdm(void)
  * @brief
  *   Initialize the LDMA controller for ping-pong transfer
  ******************************************************************************/
-void initLdma(void)
+void initLDMA(void)
 {
   LDMA_Init_t init = LDMA_INIT_DEFAULT;
 

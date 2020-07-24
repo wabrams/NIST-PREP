@@ -17,7 +17,6 @@
 
 uint32_t square_freq = 2000;
 uint32_t chirp_freq = 50;
-uint32_t max_freq; //TODO: will no longer be global now that development is complete
 
 void initCMU(void)
 {
@@ -57,7 +56,7 @@ void initTIMER(void)
 	  timer0CC0Init.cmoa = timerOutputActionToggle;
   TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
 
-  max_freq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
+  uint32_t max_freq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
   int topValue = max_freq / (2*chirp_freq);
   TIMER_TopSet(TIMER0, topValue);
 
@@ -92,7 +91,7 @@ int main(void)
   initGPIO();
   initTIMER();
 
-  // Start Timers
+  // Start Heartbeat
   TIMER_Enable(TIMER0, true);
   // we don't need to enable TIMER1, as TIMER0 will be enabling and disabling it
 

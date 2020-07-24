@@ -47,7 +47,7 @@ void appMain(gecko_configuration_t *pconfig)
 			printLog("new rw value %c\r\n", c);
 			if (c == 't') //t is for transmit
 			{
-				initLdma();
+				initLDMA();
 				pdmReset();
 				while (!pdmDone())
 				{

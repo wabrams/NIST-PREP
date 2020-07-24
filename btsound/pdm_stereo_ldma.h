@@ -21,8 +21,8 @@
 #define BUFFER_SIZE         2048
 #define PP_BUFFER_SIZE      128 //TODO: 64 or 128?
 
-void initPdm(void);
-void initLdma(void);
+void initPDM(void);
+void initLDMA(void);
 void stopLdma(void);
 void pdmPass(void);
 void pdmReset(void);

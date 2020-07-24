@@ -87,8 +87,8 @@ int main(void)
   initMcu();
   initBoard();
   initApp();
-  initLdma();
-  initPdm();
+  initLDMA();
+  initPDM();
   initVcomEnable();
 
   appMain(&config);
