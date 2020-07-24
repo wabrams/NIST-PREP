@@ -6,7 +6,6 @@ btsound/protocol
 btsound/GNU ARM v7.2.1 - Default
 btsound/.cproject
 btsound/.project
-BRD4184A_EFR32BG22_pdm_stereo_ldma/
 .ipynb_checkpoints/
 squarewave_burst_generation/.settings
 squarewave_burst_generation/app
@@ -32,3 +31,14 @@ timer_frequency_generation/protocol
 timer_frequency_generation/.cproject
 timer_frequency_generation/.project
 timer_frequency_generation/GNU ARM v7.2.1 - debug/
+pdm_microphone/.settings
+pdm_microphone/app
+pdm_microphone/hardware
+pdm_microphone/platform
+pdm_microphone/protocol
+pdm_microphone/emlib
+pdm_microphone/.cproject
+pdm_microphone/.project
+pdm_microphone/GNU ARM v7.2.1 - debug/
+pdm_microphone/CMSIS/EFR32BG22/system_efr32bg22.c
+pdm_microphone/CMSIS/EFR32BG22/startup_gcc_efr32bg22.s
