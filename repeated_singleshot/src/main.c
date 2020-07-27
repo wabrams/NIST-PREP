@@ -11,6 +11,7 @@
 #include "em_device.h"
 #include "em_timer.h"
 #include "em_chip.h"
+#include "em_rtcc.h"
 
 #include "retargetserialconfig.h"
 #include "retargetserial.h"
@@ -19,7 +20,7 @@
 #define LDMA_CHANNEL        				     0
 #define LDMA_CH_MASK    (1 << LDMA_CHANNEL)
 
-#define BUFFER_SIZE 		              2048
+#define BUFFER_SIZE 		              1024
 #define PP_BUFFER_SIZE                 128
 
 #define SINGLE_SHOT 1
@@ -31,20 +32,34 @@ uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
 bool prevBufferPing;
 
-uint32_t square_freq = 2000;
-uint32_t chirp_freq = 50;
+uint32_t square_freq = 20000;
+uint32_t dur_freq = 400;
 
-uint32_t freqA, freqB, freqPDM;
+uint32_t start, stop, durr;
+uint32_t measured_ms = 0;
+
 
 void initCMU(void)
 {
   CMU_ClockEnable(cmuClock_GPIO, true);
   CMU_ClockEnable(cmuClock_PDM, true);
-    CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL); // 19 MHz
+    CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL);
   CMU_ClockEnable(cmuClock_TIMER0, true);
     CMU_ClockSelectSet(cmuClock_TIMER0, cmuSelect_HFRCODPLL);
   CMU_ClockEnable(cmuClock_TIMER1, true);
     CMU_ClockSelectSet(cmuClock_TIMER1, cmuSelect_HFRCODPLL);
+  CMU_ClockEnable(cmuClock_RTCC, true);
+    CMU_ClockSelectSet(cmuClock_RTCC, cmuSelect_LFRCO);
+}
+
+void initRTCC(void)
+{
+  RTCC_Init_TypeDef rtccInit = RTCC_INIT_DEFAULT;
+    rtccInit.debugRun = false;
+    rtccInit.enable = true;
+    rtccInit.presc = rtccCntPresc_1;
+    rtccInit.prescMode = rtccCntTickPresc;
+  RTCC_Init(&rtccInit);
 }
 
 void initGPIO(void)
@@ -88,7 +103,7 @@ void initTIMER(void)
   TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
 
   uint32_t max_freq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
-  int topValue = max_freq / (2*chirp_freq);
+  int topValue = max_freq / (2*dur_freq);
   TIMER_TopSet(TIMER0, topValue);
 
   // Initialize TIMER1
@@ -172,6 +187,7 @@ static void initialize()
   CHIP_Init();
   // Initialize LDMA and PDM
   initCMU();
+  initRTCC();
   initGPIO();
   initTIMER();
   initPDM();
@@ -230,9 +246,15 @@ int main(void)
   {
 	  if (c == 'r')
 	  {
+	    start = RTCC_CounterGet();
+
 	    TIMER_Enable(TIMER0, true);
 	    listen();
       printData();
+
+	    stop = RTCC_CounterGet();
+	    durr = stop - start;
+	    measured_ms = durr * 0.0305;
 	  }
 	  c = RETARGET_ReadChar();
   }

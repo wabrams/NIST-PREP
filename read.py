@@ -38,10 +38,11 @@ s.bytesize = serial.EIGHTBITS
 s.parity = serial.PARITY_NONE
 s.stopbits = serial.STOPBITS_ONE
 
-larr = np.zeros(2048)
-rarr = np.zeros(2048)
+samp_len = 1024
+larr = np.zeros(samp_len)
+rarr = np.zeros(samp_len)
 # fsamp = (19e6 / (32*6))
-n = np.linspace(0, 10, 2048)
+n = np.linspace(0, 10, samp_len)
 # 19MHz / (32 * 6) =
 
 plt.ion()

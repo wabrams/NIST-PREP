@@ -16,7 +16,7 @@
  */
 
 uint32_t square_freq = 2000;
-uint32_t chirp_freq = 50;
+uint32_t dur_freq = 50;
 
 void initCMU(void)
 {
@@ -57,7 +57,7 @@ void initTIMER(void)
   TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
 
   uint32_t max_freq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
-  int topValue = max_freq / (2*chirp_freq);
+  int topValue = max_freq / (2*dur_freq);
   TIMER_TopSet(TIMER0, topValue);
 
   // Initialize TIMER1
