@@ -49,7 +49,7 @@ fig, ax = plt.subplots()
 lineL, lineR = ax.plot(n, larr, 'r-', n, rarr, 'b-')
 ax.set_xlabel("Time (mS)")
 ax.set_ylabel("Amplitude")
-ax.set_ylim(-10000, 10000)
+ax.set_ylim(-1000, 1000)
 ax.set_title("PDM Microphone Data")
 fig.canvas.draw()
 

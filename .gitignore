@@ -42,3 +42,9 @@ pdm_microphone/.project
 pdm_microphone/GNU ARM v7.2.1 - debug/
 pdm_microphone/CMSIS/EFR32BG22/system_efr32bg22.c
 pdm_microphone/CMSIS/EFR32BG22/startup_gcc_efr32bg22.s
+repeated_singleshot/.cproject
+repeated_singleshot/.project
+repeated_singleshot/.settings/
+repeated_singleshot/CMSIS/
+repeated_singleshot/emlib/
+repeated_singleshot/GNU ARM v7.2.1 - debug/

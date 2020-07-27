@@ -9,6 +9,7 @@
 #include "em_ldma.h"
 #include "em_pdm.h"
 #include "em_device.h"
+#include "em_timer.h"
 #include "em_chip.h"
 
 #include "retargetserialconfig.h"
@@ -21,34 +22,92 @@
 #define BUFFER_SIZE 		              1024
 #define PP_BUFFER_SIZE                 128
 
+#define SINGLE_SHOT 1
+
 int16_t left[BUFFER_SIZE];
 int16_t right[BUFFER_SIZE];
-
 LDMA_Descriptor_t descLink[2];
-
 uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
 bool prevBufferPing;
+
+uint32_t square_freq = 2000;
+uint32_t chirp_freq = 50;
 
 void initCMU(void)
 {
   CMU_ClockEnable(cmuClock_GPIO, true);
   CMU_ClockEnable(cmuClock_PDM, true);
-  CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL); // 19 MHz
+    CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL); // 19 MHz
+  CMU_ClockEnable(cmuClock_TIMER0, true);
+  CMU_ClockEnable(cmuClock_TIMER1, true);
 }
 
 void initGPIO(void)
 {
   // Config GPIO and pin routing
-  GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 1);    // MIC_EN
-  GPIO_PinModeSet(gpioPortC, 6, gpioModePushPull, 0);    // PDM_CLK
-  GPIO_PinModeSet(gpioPortC, 7, gpioModeInput,    0);    // PDM_DATA
+  GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 1);     // MIC_EN
+  GPIO_PinModeSet(gpioPortC, 6, gpioModePushPull, 0);     // PDM_CLK
+  GPIO_PinModeSet(gpioPortC, 7, gpioModeInput, 0);        // PDM_DATA
+  GPIO_PinModeSet(gpioPortD, 2, gpioModePushPull, 0);     // TIMER0
+  GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0);     // SPEAKER / TIMER1
 
   GPIO_SlewrateSet(gpioPortC, 7, 7);
   GPIO->PDMROUTE.ROUTEEN = GPIO_PDM_ROUTEEN_CLKPEN;
   GPIO->PDMROUTE.CLKROUTE  = (gpioPortC << _GPIO_PDM_CLKROUTE_PORT_SHIFT ) | (6 << _GPIO_PDM_CLKROUTE_PIN_SHIFT );
   GPIO->PDMROUTE.DAT0ROUTE = (gpioPortC << _GPIO_PDM_DAT0ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT0ROUTE_PIN_SHIFT);
   GPIO->PDMROUTE.DAT1ROUTE = (gpioPortC << _GPIO_PDM_DAT1ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT1ROUTE_PIN_SHIFT);
+
+  GPIO->TIMERROUTE[0].ROUTEEN  = GPIO_TIMER_ROUTEEN_CC0PEN;
+  GPIO->TIMERROUTE[0].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT) | (2 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
+
+  GPIO->TIMERROUTE[1].ROUTEEN  = GPIO_TIMER_ROUTEEN_CC0PEN | GPIO_TIMER_ROUTEEN_CC1PEN;
+  GPIO->TIMERROUTE[1].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT) | (2 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
+  GPIO->TIMERROUTE[1].CC1ROUTE = (gpioPortD << _GPIO_TIMER_CC1ROUTE_PORT_SHIFT) | (3 << _GPIO_TIMER_CC1ROUTE_PIN_SHIFT);
+}
+
+void initTIMER(void)
+{
+  // Initialize TIMER0
+  TIMER_Init_TypeDef timer0Init = TIMER_INIT_DEFAULT;
+    timer0Init.prescale = timerPrescale1;
+    timer0Init.enable   = false;
+    timer0Init.debugRun = false;
+#if SINGLE_SHOT
+    timer0Init.fallAction = timerInputActionStop;
+#endif
+  TIMER_Init(TIMER0, &timer0Init);
+
+  TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
+    timer0CC0Init.mode = timerCCModeCompare;
+    timer0CC0Init.cmoa = timerOutputActionToggle;
+  TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
+
+  uint32_t max_freq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
+  int topValue = max_freq / (2*chirp_freq);
+  TIMER_TopSet(TIMER0, topValue);
+
+  // Initialize TIMER1
+  TIMER_Init_TypeDef timer1Init = TIMER_INIT_DEFAULT;
+    timer1Init.prescale = timer0Init.prescale;
+    timer1Init.enable   = false;
+    timer1Init.debugRun = false;
+    timer1Init.riseAction = timerInputActionReloadStart;
+    timer1Init.fallAction = timerInputActionStop;
+  TIMER_Init(TIMER1, &timer1Init);
+
+  TIMER_InitCC_TypeDef timer1CC1Init = TIMER_INITCC_DEFAULT;
+    timer1CC1Init.mode = timerCCModeCompare;
+    timer1CC1Init.cmoa = timerOutputActionToggle;
+  TIMER_InitCC(TIMER1, 1, &timer1CC1Init);
+
+  TIMER_InitCC_TypeDef timer1CC0Init = TIMER_INITCC_DEFAULT;
+      timer1CC0Init.mode = timerCCModeCapture;
+  TIMER_InitCC(TIMER1, 0, &timer1CC0Init);
+
+  max_freq = CMU_ClockFreqGet(cmuClock_TIMER1) / (timer1Init.prescale + 1);
+  topValue = max_freq / (2*square_freq);
+  TIMER_TopSet(TIMER1, topValue);
 }
 
 void initPDM(void)
@@ -78,7 +137,7 @@ void initLDMA(void)
 {
   LDMA_Init_t init = LDMA_INIT_DEFAULT;
 
-  // LDMA transfers trigger on PDM Rx Data Valid
+  // LDMA transfers trigger on PDM RX Data Valid
   LDMA_TransferCfg_t periTransferTx = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_PDM_RXDATAV);
 
   // Link descriptors for ping-pong transfer
@@ -111,6 +170,7 @@ static void initialize()
   // Initialize LDMA and PDM
   initCMU();
   initGPIO();
+  initTIMER();
   initPDM();
   initLDMA();
 }
@@ -167,6 +227,7 @@ int main(void)
   {
 	  if (c == 'r')
 	  {
+	    TIMER_Enable(TIMER0, true);
 	    listen();
       printData();
 	  }

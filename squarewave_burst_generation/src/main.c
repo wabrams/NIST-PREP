@@ -93,7 +93,6 @@ int main(void)
 
   // Start Heartbeat
   TIMER_Enable(TIMER0, true);
-  // we don't need to enable TIMER1, as TIMER0 will be enabling and disabling it
 
   // Infinite Loop
   while (1)
