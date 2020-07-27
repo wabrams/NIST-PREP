@@ -19,7 +19,7 @@
 #define LDMA_CHANNEL        				     0
 #define LDMA_CH_MASK    (1 << LDMA_CHANNEL)
 
-#define BUFFER_SIZE 		              1024
+#define BUFFER_SIZE 		              2048
 #define PP_BUFFER_SIZE                 128
 
 #define SINGLE_SHOT 1
@@ -34,13 +34,17 @@ bool prevBufferPing;
 uint32_t square_freq = 2000;
 uint32_t chirp_freq = 50;
 
+uint32_t freqA, freqB, freqPDM;
+
 void initCMU(void)
 {
   CMU_ClockEnable(cmuClock_GPIO, true);
   CMU_ClockEnable(cmuClock_PDM, true);
     CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL); // 19 MHz
   CMU_ClockEnable(cmuClock_TIMER0, true);
+    CMU_ClockSelectSet(cmuClock_TIMER0, cmuSelect_HFRCODPLL);
   CMU_ClockEnable(cmuClock_TIMER1, true);
+    CMU_ClockSelectSet(cmuClock_TIMER1, cmuSelect_HFRCODPLL);
 }
 
 void initGPIO(void)
@@ -120,8 +124,7 @@ void initPDM(void)
               | PDM_CFG0_DATAFORMAT_DOUBLE16
               | PDM_CFG0_NUMCH_TWO
               | PDM_CFG0_FORDER_FIFTH;
-  // Changed: From 5 to 20
-  PDM -> CFG1 = (20 << _PDM_CFG1_PRESC_SHIFT);
+  PDM -> CFG1 = (5 << _PDM_CFG1_PRESC_SHIFT);
   // Enable module
   PDM -> EN = PDM_EN_EN;
   // Start filter
