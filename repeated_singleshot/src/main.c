@@ -32,7 +32,7 @@ uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
 bool prevBufferPing;
 
-uint32_t square_freq = 20000;
+uint32_t square_cnts = 6 * 4;
 uint32_t dur_freq = 400;
 
 uint32_t start, stop, durr;
@@ -89,7 +89,7 @@ void initTIMER(void)
 {
   // Initialize TIMER0
   TIMER_Init_TypeDef timer0Init = TIMER_INIT_DEFAULT;
-    timer0Init.prescale = timerPrescale1;
+    timer0Init.prescale = timerPrescale32;
     timer0Init.enable   = false;
     timer0Init.debugRun = false;
 #if SINGLE_SHOT
@@ -124,9 +124,7 @@ void initTIMER(void)
       timer1CC0Init.mode = timerCCModeCapture;
   TIMER_InitCC(TIMER1, 0, &timer1CC0Init);
 
-  max_freq = CMU_ClockFreqGet(cmuClock_TIMER1) / (timer1Init.prescale + 1);
-  topValue = max_freq / (2*square_freq);
-  TIMER_TopSet(TIMER1, topValue);
+  TIMER_TopSet(TIMER1, square_cnts / 2);
 }
 
 void initPDM(void)
@@ -246,15 +244,15 @@ int main(void)
   {
 	  if (c == 'r')
 	  {
-	    start = RTCC_CounterGet();
+//	    start = RTCC_CounterGet();
 
 	    TIMER_Enable(TIMER0, true);
 	    listen();
       printData();
 
-	    stop = RTCC_CounterGet();
-	    durr = stop - start;
-	    measured_ms = durr * 0.0305;
+//	    stop = RTCC_CounterGet();
+//	    durr = stop - start;
+//	    measured_ms = durr * 0.0305;
 	  }
 	  c = RETARGET_ReadChar();
   }
