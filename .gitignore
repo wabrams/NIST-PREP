@@ -48,3 +48,7 @@ repeated_singleshot/.settings/
 repeated_singleshot/CMSIS/
 repeated_singleshot/emlib/
 repeated_singleshot/GNU ARM v7.2.1 - debug/
+squarewave_pwm_generation/.cproject
+squarewave_pwm_generation/.project
+squarewave_pwm_generation/.settings/
+squarewave_pwm_generation/GNU ARM v7.2.1 - debug/
