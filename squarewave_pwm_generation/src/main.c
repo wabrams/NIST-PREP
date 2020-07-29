@@ -11,7 +11,7 @@
 
 #define FREQ_ONE 20000
 #define FREQ_TWO 30000
-#define FREQ_STEPS 100
+#define FREQ_STEPS 200
 #define FREQ_ONE_TO_TWO 1 //direction to change frequency in (false: two to one, true: one to two)
 
 #define DUTY_CYCLE_STEPS  0.05
