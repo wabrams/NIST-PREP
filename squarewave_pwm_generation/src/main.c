@@ -9,12 +9,22 @@
 #define BSP_BUTTON0_PORT                     (gpioPortB)
 #include "gpiointerrupt.h"
 
-#define PWM_FREQ          20000
+#define FREQ_ONE 20000
+#define FREQ_TWO 30000
+#define FREQ_STEPS 100
+#define FREQ_ONE_TO_TWO 1 //direction to change frequency in (false: two to one, true: one to two)
+
 #define DUTY_CYCLE_STEPS  0.05
 #define TARGET_DUTY_CYCLE	0.55
 
 static uint32_t topValue = 0;
-volatile int pulse_width= PWM_FREQ / 400;  // this sets the pulse width to 2.5mS (1/400)
+static uint32_t timerFreq;
+
+#if FREQ_ONE_TO_TWO
+  static uint32_t current_freq = FREQ_ONE;
+#else
+  static uint32_t current_freq = FREQ_TWO;
+#endif
 
 typedef enum squarechirp_mode_e
 {
@@ -25,7 +35,6 @@ typedef enum squarechirp_mode_e
 } squarechirp_mode_t;
 
 static volatile squarechirp_mode_t chirp_mode = chirpOff;
-static volatile uint32_t chirp_cnt = 0;
 static volatile float dutyCycle = 0;
 
 void button0Callback(uint8_t pin)
@@ -52,9 +61,23 @@ void TIMER0_IRQHandler(void)
         TIMER_CompareBufSet(TIMER0, 1, (uint32_t)(topValue * dutyCycle));
         break;
       case chirpOn:
-        chirp_cnt++;
-        if (chirp_cnt >= pulse_width)
+        #if FREQ_ONE_TO_TWO
+          current_freq += FREQ_STEPS;
+          if (current_freq >= FREQ_TWO)
+          {
+            current_freq = FREQ_TWO;
             chirp_mode = chirpDec;
+          }
+        #else
+          current_freq -= FREQ_STEPS;
+          if (current_freq <= FREQ_ONE)
+          {
+            current_freq = FREQ_ONE;
+            chirp_mode = chirpDec;
+          }
+        #endif
+        topValue = (timerFreq / current_freq);
+        TIMER_TopSet(TIMER0, topValue);
         break;
       case chirpDec:
         dutyCycle -= DUTY_CYCLE_STEPS;
@@ -66,8 +89,13 @@ void TIMER0_IRQHandler(void)
         TIMER_CompareBufSet(TIMER0, 1, (uint32_t)(topValue * dutyCycle));
         break;
       case chirpOff:
-        chirp_cnt = 0;
-
+        #if FREQ_ONE_TO_TWO
+          current_freq = FREQ_ONE;
+        #else
+          current_freq = FREQ_TWO;
+        #endif
+        topValue = (timerFreq / current_freq);
+        TIMER_TopSet(TIMER0, topValue);
         //TODO: disable timer here
         break;
     }
@@ -117,8 +145,8 @@ void initTIMER(void)
   // Start with 10% duty cycle
   dutyCycle = DUTY_CYCLE_STEPS;
 
-  uint32_t timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
-  topValue = (timerFreq / PWM_FREQ);
+  timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
+  topValue = (timerFreq / current_freq);
   TIMER_TopSet(TIMER0, topValue);
   TIMER_CompareSet(TIMER0, 1, (uint32_t)(topValue * dutyCycle));
 
