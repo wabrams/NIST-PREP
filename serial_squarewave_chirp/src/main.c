@@ -122,8 +122,8 @@ void initCMU(void)
   CMU_ClockEnable(cmuClock_GPIO, true);
   CMU_ClockEnable(cmuClock_PDM, true);
     CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL);
-//  CMU_ClockEnable(cmuClock_TIMER0, true);
-//    CMU_ClockSelectSet(cmuClock_TIMER0, cmuSelect_HFRCODPLL);
+  CMU_ClockEnable(cmuClock_TIMER0, true);
+    CMU_ClockSelectSet(cmuClock_TIMER0, cmuSelect_HFRCODPLL);
   CMU_ClockEnable(cmuClock_RTCC, true);
     CMU_ClockSelectSet(cmuClock_RTCC, cmuSelect_LFRCO);
 }
@@ -143,9 +143,9 @@ void initGPIO(void)
   GPIO->PDMROUTE.DAT0ROUTE = (gpioPortC << _GPIO_PDM_DAT0ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT0ROUTE_PIN_SHIFT);
   GPIO->PDMROUTE.DAT1ROUTE = (gpioPortC << _GPIO_PDM_DAT1ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT1ROUTE_PIN_SHIFT);
   //timer
-//  GPIO->TIMERROUTE[0].ROUTEEN  = GPIO_TIMER_ROUTEEN_CC0PEN | GPIO_TIMER_ROUTEEN_CC1PEN;
+  GPIO->TIMERROUTE[0].ROUTEEN  = GPIO_TIMER_ROUTEEN_CC1PEN; // | GPIO_TIMER_ROUTEEN_CC0PEN
 //  GPIO->TIMERROUTE[0].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT) | (2 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
-//  GPIO->TIMERROUTE[0].CC1ROUTE = (gpioPortD << _GPIO_TIMER_CC1ROUTE_PORT_SHIFT) | (3 << _GPIO_TIMER_CC1ROUTE_PIN_SHIFT);
+  GPIO->TIMERROUTE[0].CC1ROUTE = (gpioPortD << _GPIO_TIMER_CC1ROUTE_PORT_SHIFT) | (3 << _GPIO_TIMER_CC1ROUTE_PIN_SHIFT);
 }
 
 void initRTCC(void)
@@ -160,17 +160,16 @@ void initRTCC(void)
 
 void initTIMER(void)
 {
-
   TIMER_Init_TypeDef timer0Init = TIMER_INIT_DEFAULT;
     timer0Init.prescale = timerPrescale64;
     timer0Init.enable = false;
     timer0Init.debugRun = false;
-    timer0Init.riseAction = timerInputActionReloadStart;
+//    timer0Init.riseAction = timerInputActionReloadStart;
   TIMER_Init(TIMER0, &timer0Init);
 
-  TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
-    timer0CC0Init.mode = timerCCModeCapture;
-  TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
+//  TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
+//    timer0CC0Init.mode = timerCCModeCapture;
+//  TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
 
   TIMER_InitCC_TypeDef timer0CC1Init = TIMER_INITCC_DEFAULT;
     timer0CC1Init.mode = timerCCModePWM;
@@ -246,9 +245,9 @@ static void initialize()
   CHIP_Init();
   // Initialize LDMA and PDM
   initCMU();
-  initRTCC();
+//  initRTCC();
   initGPIO();
-//  initTIMER();
+  initTIMER();
   initPDM();
   initLDMA();
 }
@@ -257,10 +256,15 @@ static void listen(void)
 {
   int offset = 0;
   bool lastPing = prevBufferPing;
+
   while (offset < BUFFER_SIZE)
   {
     while (lastPing == prevBufferPing)
+    {
       EMU_EnterEM1();
+    }
+    lastPing = prevBufferPing;
+
     if(prevBufferPing)
     {
       for(int i = 0; i < PP_BUFFER_SIZE; i++)
@@ -308,7 +312,7 @@ int main(void)
   {
     if (c == 'r')
     {
-//      TIMER_Enable(TIMER0, true);
+      TIMER_Enable(TIMER0, true);
       listen();
       printData();
     }
