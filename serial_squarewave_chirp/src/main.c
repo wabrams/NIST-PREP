@@ -1,6 +1,4 @@
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdarg.h>
+#include <stdio.h>
 
 #include "em_chip.h"
 #include "em_cmu.h"
@@ -15,15 +13,21 @@
 
 #include "retargetserialconfig.h"
 #include "retargetserial.h"
-#include "stdio.h"
 
-#define LDMA_CHANNEL        				     0
+#define FREQ_ONE 20000
+#define FREQ_TWO 30000
+#define FREQ_STEPS 200
+#define FREQ_ONE_TO_TWO 1 //direction to change frequency in (false: two to one, true: one to two)
+
+#define DUTY_CYCLE_STEPS  0.05
+#define TARGET_DUTY_CYCLE 0.55
+
+#define LDMA_CHANNEL                     0
 #define LDMA_CH_MASK    (1 << LDMA_CHANNEL)
 
-#define BUFFER_SIZE 		              1024
+#define BUFFER_SIZE                   1024
 #define PP_BUFFER_SIZE                 128
 
-#define SINGLE_SHOT 1
 
 int16_t left[BUFFER_SIZE];
 int16_t right[BUFFER_SIZE];
@@ -32,11 +36,85 @@ uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
 bool prevBufferPing;
 
-uint32_t square_cnts = 6 * 4;
-uint32_t dur_freq = 400;
+static uint32_t topValue = 0;
+static uint32_t timerFreq = 0;
 
-uint32_t start, stop, durr;
-uint32_t measured_ms = 0;
+#if FREQ_ONE_TO_TWO
+  static uint32_t current_freq = FREQ_ONE;
+#else
+  static uint32_t current_freq = FREQ_TWO;
+#endif
+
+typedef enum squarechirp_mode_e
+{
+  chirpInc,
+  chirpOn,
+  chirpDec,
+  chirpOff
+} squarechirp_mode_t;
+
+static volatile squarechirp_mode_t chirp_mode = chirpInc;
+static volatile float dutyCycle = 0;
+
+void TIMER0_IRQHandler(void)
+{
+  uint32_t flags = TIMER0 -> IF_CLR = TIMER0 -> IF;
+  // Acknowledge the interrupt
+  if (flags & TIMER_IF_CC1)
+  {
+    switch (chirp_mode)
+    {
+      case chirpInc:
+        dutyCycle += DUTY_CYCLE_STEPS;
+        if (dutyCycle >= TARGET_DUTY_CYCLE)
+        {
+          chirp_mode = chirpOn;
+          dutyCycle = TARGET_DUTY_CYCLE;
+        }
+        TIMER_CompareBufSet(TIMER0, 1, (uint32_t)(topValue * dutyCycle));
+        break;
+      case chirpOn:
+        #if FREQ_ONE_TO_TWO
+          current_freq += FREQ_STEPS;
+          if (current_freq >= FREQ_TWO)
+          {
+            current_freq = FREQ_TWO;
+            chirp_mode = chirpDec;
+          }
+        #else
+          current_freq -= FREQ_STEPS;
+          if (current_freq <= FREQ_ONE)
+          {
+            current_freq = FREQ_ONE;
+            chirp_mode = chirpDec;
+          }
+        #endif
+        topValue = (timerFreq / current_freq);
+        TIMER_TopSet(TIMER0, topValue);
+        break;
+      case chirpDec:
+        dutyCycle -= DUTY_CYCLE_STEPS;
+        if (dutyCycle <= 0)
+        {
+          chirp_mode = chirpOff;
+          dutyCycle = 0;
+        }
+        TIMER_CompareBufSet(TIMER0, 1, (uint32_t)(topValue * dutyCycle));
+        break;
+      case chirpOff:
+        #if FREQ_ONE_TO_TWO
+          current_freq = FREQ_ONE;
+        #else
+          current_freq = FREQ_TWO;
+        #endif
+        topValue = (timerFreq / current_freq);
+        TIMER_TopSet(TIMER0, topValue);
+        TIMER_Enable(TIMER0, false);
+        chirp_mode = chirpInc;
+        break;
+    }
+  }
+}
 
 
 void initCMU(void)
@@ -44,12 +122,30 @@ void initCMU(void)
   CMU_ClockEnable(cmuClock_GPIO, true);
   CMU_ClockEnable(cmuClock_PDM, true);
     CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL);
-  CMU_ClockEnable(cmuClock_TIMER0, true);
-    CMU_ClockSelectSet(cmuClock_TIMER0, cmuSelect_HFRCODPLL);
-  CMU_ClockEnable(cmuClock_TIMER1, true);
-    CMU_ClockSelectSet(cmuClock_TIMER1, cmuSelect_HFRCODPLL);
+//  CMU_ClockEnable(cmuClock_TIMER0, true);
+//    CMU_ClockSelectSet(cmuClock_TIMER0, cmuSelect_HFRCODPLL);
   CMU_ClockEnable(cmuClock_RTCC, true);
     CMU_ClockSelectSet(cmuClock_RTCC, cmuSelect_LFRCO);
+}
+
+void initGPIO(void)
+{
+  //gpio
+  GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 1);     // MIC_EN
+  GPIO_PinModeSet(gpioPortC, 6, gpioModePushPull, 0);     // PDM_CLK
+  GPIO_PinModeSet(gpioPortC, 7, gpioModeInput, 0);        // PDM_DATA
+  GPIO_PinModeSet(gpioPortD, 2, gpioModePushPull, 0);
+  GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0);
+  //pdm
+  GPIO_SlewrateSet(gpioPortC, 7, 7);
+  GPIO->PDMROUTE.ROUTEEN = GPIO_PDM_ROUTEEN_CLKPEN;
+  GPIO->PDMROUTE.CLKROUTE  = (gpioPortC << _GPIO_PDM_CLKROUTE_PORT_SHIFT ) | (6 << _GPIO_PDM_CLKROUTE_PIN_SHIFT );
+  GPIO->PDMROUTE.DAT0ROUTE = (gpioPortC << _GPIO_PDM_DAT0ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT0ROUTE_PIN_SHIFT);
+  GPIO->PDMROUTE.DAT1ROUTE = (gpioPortC << _GPIO_PDM_DAT1ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT1ROUTE_PIN_SHIFT);
+  //timer
+//  GPIO->TIMERROUTE[0].ROUTEEN  = GPIO_TIMER_ROUTEEN_CC0PEN | GPIO_TIMER_ROUTEEN_CC1PEN;
+//  GPIO->TIMERROUTE[0].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT) | (2 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
+//  GPIO->TIMERROUTE[0].CC1ROUTE = (gpioPortD << _GPIO_TIMER_CC1ROUTE_PORT_SHIFT) | (3 << _GPIO_TIMER_CC1ROUTE_PIN_SHIFT);
 }
 
 void initRTCC(void)
@@ -62,69 +158,34 @@ void initRTCC(void)
   RTCC_Init(&rtccInit);
 }
 
-void initGPIO(void)
-{
-  // Config GPIO and pin routing
-  GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 1);     // MIC_EN
-  GPIO_PinModeSet(gpioPortC, 6, gpioModePushPull, 0);     // PDM_CLK
-  GPIO_PinModeSet(gpioPortC, 7, gpioModeInput, 0);        // PDM_DATA
-  GPIO_PinModeSet(gpioPortD, 2, gpioModePushPull, 0);     // TIMER0
-  GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0);     // SPEAKER / TIMER1
-
-  GPIO_SlewrateSet(gpioPortC, 7, 7);
-  GPIO->PDMROUTE.ROUTEEN = GPIO_PDM_ROUTEEN_CLKPEN;
-  GPIO->PDMROUTE.CLKROUTE  = (gpioPortC << _GPIO_PDM_CLKROUTE_PORT_SHIFT ) | (6 << _GPIO_PDM_CLKROUTE_PIN_SHIFT );
-  GPIO->PDMROUTE.DAT0ROUTE = (gpioPortC << _GPIO_PDM_DAT0ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT0ROUTE_PIN_SHIFT);
-  GPIO->PDMROUTE.DAT1ROUTE = (gpioPortC << _GPIO_PDM_DAT1ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT1ROUTE_PIN_SHIFT);
-
-  GPIO->TIMERROUTE[0].ROUTEEN  = GPIO_TIMER_ROUTEEN_CC0PEN;
-  GPIO->TIMERROUTE[0].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT) | (2 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
-
-  GPIO->TIMERROUTE[1].ROUTEEN  = GPIO_TIMER_ROUTEEN_CC0PEN | GPIO_TIMER_ROUTEEN_CC1PEN;
-  GPIO->TIMERROUTE[1].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT) | (2 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
-  GPIO->TIMERROUTE[1].CC1ROUTE = (gpioPortD << _GPIO_TIMER_CC1ROUTE_PORT_SHIFT) | (3 << _GPIO_TIMER_CC1ROUTE_PIN_SHIFT);
-}
-
 void initTIMER(void)
 {
-  // Initialize TIMER0
+
   TIMER_Init_TypeDef timer0Init = TIMER_INIT_DEFAULT;
-    timer0Init.prescale = timerPrescale32;
-    timer0Init.enable   = false;
+    timer0Init.prescale = timerPrescale64;
+    timer0Init.enable = false;
     timer0Init.debugRun = false;
-#if SINGLE_SHOT
-    timer0Init.fallAction = timerInputActionStop;
-#endif
+    timer0Init.riseAction = timerInputActionReloadStart;
   TIMER_Init(TIMER0, &timer0Init);
 
   TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
-    timer0CC0Init.mode = timerCCModeCompare;
-    timer0CC0Init.cmoa = timerOutputActionToggle;
+    timer0CC0Init.mode = timerCCModeCapture;
   TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
 
-  uint32_t max_freq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
-  int topValue = max_freq / (2*dur_freq);
+  TIMER_InitCC_TypeDef timer0CC1Init = TIMER_INITCC_DEFAULT;
+    timer0CC1Init.mode = timerCCModePWM;
+  TIMER_InitCC(TIMER0, 1, &timer0CC1Init);
+
+  // Start with 10% duty cycle
+  dutyCycle = DUTY_CYCLE_STEPS;
+
+  timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
+  topValue = (timerFreq / current_freq);
   TIMER_TopSet(TIMER0, topValue);
+  TIMER_CompareSet(TIMER0, 1, (uint32_t)(topValue * dutyCycle));
 
-  // Initialize TIMER1
-  TIMER_Init_TypeDef timer1Init = TIMER_INIT_DEFAULT;
-    timer1Init.prescale = timer0Init.prescale;
-    timer1Init.enable   = false;
-    timer1Init.debugRun = false;
-    timer1Init.riseAction = timerInputActionReloadStart;
-    timer1Init.fallAction = timerInputActionStop;
-  TIMER_Init(TIMER1, &timer1Init);
-
-  TIMER_InitCC_TypeDef timer1CC1Init = TIMER_INITCC_DEFAULT;
-    timer1CC1Init.mode = timerCCModeCompare;
-    timer1CC1Init.cmoa = timerOutputActionToggle;
-  TIMER_InitCC(TIMER1, 1, &timer1CC1Init);
-
-  TIMER_InitCC_TypeDef timer1CC0Init = TIMER_INITCC_DEFAULT;
-      timer1CC0Init.mode = timerCCModeCapture;
-  TIMER_InitCC(TIMER1, 0, &timer1CC0Init);
-
-  TIMER_TopSet(TIMER1, square_cnts / 2);
+  TIMER0 -> IEN = TIMER_IEN_CC1;
+  NVIC_EnableIRQ(TIMER0_IRQn);
 }
 
 void initPDM(void)
@@ -187,7 +248,7 @@ static void initialize()
   initCMU();
   initRTCC();
   initGPIO();
-  initTIMER();
+//  initTIMER();
   initPDM();
   initLDMA();
 }
@@ -195,10 +256,11 @@ static void initialize()
 static void listen(void)
 {
   int offset = 0;
-
+  bool lastPing = prevBufferPing;
   while (offset < BUFFER_SIZE)
   {
-    EMU_EnterEM1();
+    while (lastPing == prevBufferPing)
+      EMU_EnterEM1();
     if(prevBufferPing)
     {
       for(int i = 0; i < PP_BUFFER_SIZE; i++)
@@ -238,23 +300,19 @@ int main(void)
 {
   initialize();
 
+//  GPIO_PinOutToggle(gpioPortD, 2);
+
   char c = 'c';
 
   do
   {
-	  if (c == 'r')
-	  {
-//	    start = RTCC_CounterGet();
-
-	    TIMER_Enable(TIMER0, true);
-	    listen();
+    if (c == 'r')
+    {
+//      TIMER_Enable(TIMER0, true);
+      listen();
       printData();
-
-//	    stop = RTCC_CounterGet();
-//	    durr = stop - start;
-//	    measured_ms = durr * 0.0305;
-	  }
-	  c = RETARGET_ReadChar();
+    }
+    c = RETARGET_ReadChar();
   }
   while (c != 'q');
 }

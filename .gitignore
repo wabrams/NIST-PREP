@@ -52,3 +52,9 @@ squarewave_pwm_generation/.cproject
 squarewave_pwm_generation/.project
 squarewave_pwm_generation/.settings/
 squarewave_pwm_generation/GNU ARM v7.2.1 - debug/
+serial_squarewave_chirp/.cproject
+serial_squarewave_chirp/.project
+serial_squarewave_chirp/emlib/
+serial_squarewave_chirp/GNU ARM v7.2.1 - debug/
+serial_squarewave_chirp/.settings/
+serial_squarewave_chirp/CMSIS/EFR32BG22/
