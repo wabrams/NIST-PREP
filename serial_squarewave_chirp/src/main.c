@@ -16,7 +16,8 @@
 
 #define FREQ_ONE 20000
 #define FREQ_TWO 30000
-#define FREQ_STEPS 200
+#define FREQ_AVG ((FREQ_ONE + FREQ_TWO) / 2)
+#define FREQ_GAP (FREQ_TWO - FREQ_ONE)
 #define FREQ_ONE_TO_TWO 1 //direction to change frequency in (false: two to one, true: one to two)
 
 #define DUTY_CYCLE_STEPS  0.05
@@ -36,14 +37,10 @@ uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
 bool prevBufferPing;
 
-static uint32_t topValue = 0;
-static uint32_t timerFreq = 0;
-
-#if FREQ_ONE_TO_TWO
-  static uint32_t current_freq = FREQ_ONE;
-#else
-  static uint32_t current_freq = FREQ_TWO;
-#endif
+float timeChirp = 2.0; //in mS
+uint32_t chirpN;
+uint32_t topOne, topTwo, topInc, topValue;
+uint32_t timerFreq;
 
 typedef enum squarechirp_mode_e
 {
@@ -75,21 +72,20 @@ void TIMER0_IRQHandler(void)
         break;
       case chirpOn:
         #if FREQ_ONE_TO_TWO
-          current_freq += FREQ_STEPS;
-          if (current_freq >= FREQ_TWO)
+          topValue -= topInc;
+          if (topValue <= topTwo)
           {
-            current_freq = FREQ_TWO;
+            topValue = topTwo;
             chirp_mode = chirpDec;
           }
         #else
-          current_freq -= FREQ_STEPS;
-          if (current_freq <= FREQ_ONE)
+          topValue += topInc;
+          if (topValue >= topOne)
           {
-            current_freq = FREQ_ONE;
+            topValue = topOne;
             chirp_mode = chirpDec;
           }
         #endif
-        topValue = (timerFreq / current_freq);
         TIMER_TopSet(TIMER0, topValue);
         break;
       case chirpDec:
@@ -103,11 +99,10 @@ void TIMER0_IRQHandler(void)
         break;
       case chirpOff:
         #if FREQ_ONE_TO_TWO
-          current_freq = FREQ_ONE;
+          topValue = topOne;
         #else
-          current_freq = FREQ_TWO;
+          topValue = topTwo;
         #endif
-        topValue = (timerFreq / current_freq);
         TIMER_TopSet(TIMER0, topValue);
         TIMER_Enable(TIMER0, false);
         chirp_mode = chirpInc;
@@ -161,7 +156,7 @@ void initRTCC(void)
 void initTIMER(void)
 {
   TIMER_Init_TypeDef timer0Init = TIMER_INIT_DEFAULT;
-    timer0Init.prescale = timerPrescale64;
+    timer0Init.prescale = timerPrescale1;
     timer0Init.enable = false;
     timer0Init.debugRun = false;
 //    timer0Init.riseAction = timerInputActionReloadStart;
@@ -179,7 +174,15 @@ void initTIMER(void)
   dutyCycle = DUTY_CYCLE_STEPS;
 
   timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
-  topValue = (timerFreq / current_freq);
+  topOne = timerFreq / FREQ_ONE;
+  topTwo = timerFreq / FREQ_TWO;
+  chirpN = timeChirp * FREQ_AVG / 1000.0;
+  topInc = ((float)FREQ_GAP / (float)(FREQ_ONE * FREQ_TWO)) * timerFreq / chirpN;
+  #if FREQ_ONE_TO_TWO
+    topValue = topOne;
+  #else
+    topValue = topTwo;
+  #endif
   TIMER_TopSet(TIMER0, topValue);
   TIMER_CompareSet(TIMER0, 1, (uint32_t)(topValue * dutyCycle));
 
@@ -304,17 +307,37 @@ int main(void)
 {
   initialize();
 
-//  GPIO_PinOutToggle(gpioPortD, 2);
-
-  char c = 'c';
+  char c = 'i';
 
   do
   {
-    if (c == 'r')
+    switch (c)
     {
-      TIMER_Enable(TIMER0, true);
-      listen();
-      printData();
+      case 'a': // all (chirp + listen, transmit)
+        TIMER_Enable(TIMER0, true);
+        listen();
+        printData();
+        break;
+      case 'c': // chirp
+        TIMER_Enable(TIMER0, true);
+        break;
+      case 'i':
+        break;
+      case 'l': // listen
+        listen();
+        break;
+      case 'r': // record (chirp + listen)
+        TIMER_Enable(TIMER0, true);
+        listen();
+        break;
+      case 's': // sample numbers
+        printf("samp\r\n%d\r\n", BUFFER_SIZE);
+//        printf("avg\r\n%d\r\n", FREQ_AVG);
+        RETARGET_SerialFlush();
+        break;
+      case 't': // transmit
+        printData();
+        break;
     }
     c = RETARGET_ReadChar();
   }
