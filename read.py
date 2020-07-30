@@ -4,6 +4,7 @@ import serial.tools.list_ports
 import platform
 import matplotlib.pyplot as plt
 import numpy as np
+import csv
 
 plt.style.use('dark_background')
 
@@ -54,8 +55,10 @@ ax.set_ylim(-1000, 1000)
 ax.set_title("PDM Microphone Data")
 fig.canvas.draw()
 
-tprint("Entering Infinite Loop")
-
+tprint("Opening CSV")
+filename = "listen.csv"
+csvfile = open(filename, "w", newline='') #windows translates \r\n into \r\r\n
+csvwriter = csv.writer(csvfile)
 
 while True:
     s.write(b"r")
@@ -78,6 +81,10 @@ while True:
 
     larr = np.array(list(map(int, larr_raw)))
     rarr = np.array(list(map(int, rarr_raw)))
+
+    tprint("writing to CSV")
+    csvwriter.writerow(larr)
+    csvwriter.writerow(rarr)
 
     lineL.set_ydata(larr)
     lineR.set_ydata(rarr)

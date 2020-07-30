@@ -245,7 +245,7 @@ static void initialize()
   CHIP_Init();
   // Initialize LDMA and PDM
   initCMU();
-//  initRTCC();
+  initRTCC();
   initGPIO();
   initTIMER();
   initPDM();
