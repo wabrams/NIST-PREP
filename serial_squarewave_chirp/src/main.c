@@ -14,7 +14,7 @@
 #include "retargetserialconfig.h"
 #include "retargetserial.h"
 
-#define FREQ_ONE 20000
+#define FREQ_ONE 28000
 #define FREQ_TWO 30000
 #define FREQ_AVG ((FREQ_ONE + FREQ_TWO) / 2)
 #define FREQ_GAP (FREQ_TWO - FREQ_ONE)
@@ -39,7 +39,8 @@ bool prevBufferPing;
 
 float timeChirp = 2.0; //in mS
 uint32_t chirpN;
-uint32_t topOne, topTwo, topInc, topValue;
+uint32_t topOne, topTwo;
+float topValue, topInc;
 uint32_t timerFreq;
 
 typedef enum squarechirp_mode_e
@@ -86,7 +87,8 @@ void TIMER0_IRQHandler(void)
             chirp_mode = chirpDec;
           }
         #endif
-        TIMER_TopSet(TIMER0, topValue);
+        TIMER_CompareBufSet(TIMER0, 1, (uint32_t)(topValue * dutyCycle));
+        TIMER_TopBufSet(TIMER0, topValue);
         break;
       case chirpDec:
         dutyCycle -= DUTY_CYCLE_STEPS;
