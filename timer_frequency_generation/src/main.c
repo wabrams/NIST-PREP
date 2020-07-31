@@ -5,7 +5,7 @@
 #include "em_gpio.h"
 #include "em_timer.h"
 
-#define OUT_FREQ 1000				/**< Output Frequency (Hz) **/
+#define OUT_FREQ 21000				/**< Output Frequency (Hz) **/
 #define REFERENCE_INVERT 1			/**< Compiler Macro, based on speaker configuration **/
 
 void initCMU(void)

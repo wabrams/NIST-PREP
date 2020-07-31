@@ -14,7 +14,7 @@
 #include "retargetserialconfig.h"
 #include "retargetserial.h"
 
-#define FREQ_ONE 28000
+#define FREQ_ONE 20000
 #define FREQ_TWO 30000
 #define FREQ_AVG ((FREQ_ONE + FREQ_TWO) / 2)
 #define FREQ_GAP (FREQ_TWO - FREQ_ONE)
@@ -334,7 +334,6 @@ int main(void)
         break;
       case 's': // sample numbers
         printf("samp\r\n%d\r\n", BUFFER_SIZE);
-//        printf("avg\r\n%d\r\n", FREQ_AVG);
         RETARGET_SerialFlush();
         break;
       case 't': // transmit
