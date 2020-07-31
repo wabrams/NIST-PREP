@@ -1707,7 +1707,7 @@ OUTPUT(timer_frequency_generation.axf elf32-littlearm)
  .debug_aranges
                 0x00000238       0x38 ./src/main.o
 
-.debug_str      0x00000000   0x18043d
+.debug_str      0x00000000   0x18043e
  .debug_str     0x00000000       0xf6 ./CMSIS/EFR32BG22/startup_efr32bg22.o
  .debug_str     0x000000f6   0x177bf9 ./CMSIS/EFR32BG22/system_efr32bg22.o
                              0x1781a1 (size before relaxing)
@@ -1717,8 +1717,8 @@ OUTPUT(timer_frequency_generation.axf elf32-littlearm)
                              0x1791cd (size before relaxing)
  .debug_str     0x0017d9dc     0x297e ./emlib/em_timer.o
                              0x17a194 (size before relaxing)
- .debug_str     0x0018035a       0xe3 ./src/main.o
-                             0x17b3c5 (size before relaxing)
+ .debug_str     0x0018035a       0xe4 ./src/main.o
+                             0x17b3c6 (size before relaxing)
 
 .debug_loc      0x00000000     0x3833
  .debug_loc     0x00000000       0x94 ./CMSIS/EFR32BG22/system_efr32bg22.o
