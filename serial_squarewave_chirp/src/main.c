@@ -14,6 +14,8 @@
 #include "retargetserialconfig.h"
 #include "retargetserial.h"
 
+#define CONSTANT_TONE 0
+
 #define FREQ_ONE 20000
 #define FREQ_TWO 30000
 #define FREQ_AVG ((FREQ_ONE + FREQ_TWO) / 2)
@@ -29,7 +31,6 @@
 #define BUFFER_SIZE                   1024
 #define PP_BUFFER_SIZE                 128
 
-
 int16_t left[BUFFER_SIZE];
 int16_t right[BUFFER_SIZE];
 LDMA_Descriptor_t descLink[2];
@@ -42,6 +43,8 @@ uint32_t chirpN;
 uint32_t topOne, topTwo;
 float topValue, topInc;
 uint32_t timerFreq;
+
+bool chirpEn = false;
 
 typedef enum squarechirp_mode_e
 {
@@ -60,6 +63,9 @@ void TIMER0_IRQHandler(void)
   // Acknowledge the interrupt
   if (flags & TIMER_IF_CC1)
   {
+#if CONSTANT_TONE
+
+#else
     switch (chirp_mode)
     {
       case chirpInc:
@@ -108,8 +114,10 @@ void TIMER0_IRQHandler(void)
         TIMER_TopSet(TIMER0, topValue);
         TIMER_Enable(TIMER0, false);
         chirp_mode = chirpInc;
+        chirpEn = false;
         break;
     }
+#endif
   }
 }
 
@@ -173,8 +181,11 @@ void initTIMER(void)
   TIMER_InitCC(TIMER0, 1, &timer0CC1Init);
 
   // Start with 10% duty cycle
+#if CONSTANT_TONE
+  dutyCycle = TARGET_DUTY_CYCLE;
+#else
   dutyCycle = DUTY_CYCLE_STEPS;
-
+#endif
   timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (timer0Init.prescale + 1);
   topOne = timerFreq / FREQ_ONE;
   topTwo = timerFreq / FREQ_TWO;
@@ -236,6 +247,10 @@ void LDMA_IRQHandler(void)
   uint32_t pending = LDMA_IntGet();
   LDMA_IntClear(pending);
 
+  if (chirpEn)
+  {
+    TIMER_Enable(TIMER0, true);
+  }
   if(pending & LDMA_IF_ERROR)
   {
     while(1); //TODO: assert here
@@ -313,15 +328,15 @@ int main(void)
 
   do
   {
-    switch (c)
+    switch (c) //TODO: need a listen + transmit mode
     {
       case 'a': // all (chirp + listen, transmit)
-        TIMER_Enable(TIMER0, true);
+        chirpEn = true;
         listen();
         printData();
         break;
       case 'c': // chirp
-        TIMER_Enable(TIMER0, true);
+        chirpEn = true;
         break;
       case 'i':
         break;
@@ -329,7 +344,7 @@ int main(void)
         listen();
         break;
       case 'r': // record (chirp + listen)
-        TIMER_Enable(TIMER0, true);
+        chirpEn = true;
         listen();
         break;
       case 's': // sample numbers
