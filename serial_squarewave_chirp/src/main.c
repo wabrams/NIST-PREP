@@ -20,17 +20,18 @@ int freq_stop = 30000;
 #define DUTY_CYCLE_STEPS  0.1
 #define TARGET_DUTY_CYCLE 0.50
 
-#define LDMA_CHANNEL                     0
-#define LDMA_CH_MASK    (1 << LDMA_CHANNEL)
+#define LDMA_PDM_CHANNEL             0
+#define LDMA_TIMER_TOPB_CHANNEL      1
+#define LDMA_TIMER_COMP_CHANNEL      2
 
 #define BUFFER_SIZE               (1 << 11)
 #define PP_BUFFER_SIZE                 256
-#define PERIOD_BUFFER_SIZE			       256
+#define TIMER_BUFFER_SIZE			       256
 
 bool prevBufferPing;
 int16_t left[BUFFER_SIZE];
 int16_t right[BUFFER_SIZE];
-LDMA_Descriptor_t descLink[2];
+LDMA_Descriptor_t descLink[4];
 uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
 
@@ -41,7 +42,7 @@ uint32_t offset;
 float top_step;
 uint32_t timerFreq;
 bool play_chirp = false;
-uint32_t list_periods[PERIOD_BUFFER_SIZE];
+uint32_t list_periods[TIMER_BUFFER_SIZE];
 
 typedef enum squarechirp_mode_e
 {
@@ -69,7 +70,8 @@ void TIMER0_IRQHandler(void)
       case chirpInc:
         dutyCycle += DUTY_CYCLE_STEPS;
         ramp_length++;
-        if (dutyCycle >= TARGET_DUTY_CYCLE) {
+        if (dutyCycle >= TARGET_DUTY_CYCLE)
+        {
           chirp_mode = chirpOn;
           dutyCycle = TARGET_DUTY_CYCLE;
           ramp_length--;
@@ -77,14 +79,16 @@ void TIMER0_IRQHandler(void)
         break;
       case chirpOn:
         // I think below should be -2... or 0... -3 seems to be corrrect according to my oscilloscope
-        if (counter == (N_waves - 3 - ramp_length)) {
+        if (counter == (N_waves - 3 - ramp_length))
+        {
           chirp_mode = chirpDec;
           //printf("counter: %d\r\n", counter);
         }
         break;
       case chirpDec:
         dutyCycle -= DUTY_CYCLE_STEPS;
-        if (dutyCycle <= 0) {
+        if (dutyCycle <= 0)
+        {
           // chirp_mode = chirpOff;
           dutyCycle = 0;
           TIMER_Enable(TIMER0, false);
@@ -154,8 +158,8 @@ void setupChirp(int freq_start, int freq_stop, int prescale)
 	dutyCycle = DUTY_CYCLE_STEPS;
 
 	timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (prescale + 1);
-	top_start = timerFreq / freq_start;  // period of start frequency
-	top_stop = timerFreq / freq_stop;  // period of stop frequency
+	top_start = timerFreq / freq_start; // period of start frequency
+	top_stop  = timerFreq / freq_stop;  // period of stop frequency
 	N_waves = pulse_width * (freq_stop+freq_start)/2;
 	top_step = ((float) (freq_start - freq_stop)) / ((float) (freq_start * freq_stop)) * timerFreq / (N_waves - 1);
 
@@ -171,7 +175,8 @@ void setupChirp(int freq_start, int freq_stop, int prescale)
     // clear out previous list of periods
 	printf("Check first stop: %lu\r\n", TIMER_TopGet(TIMER0));
 
-	memset(list_periods, 255, PERIOD_BUFFER_SIZE*sizeof(uint32_t));
+	memset(list_periods, 255, TIMER_BUFFER_SIZE*sizeof(uint32_t));
+	//TODO: set new list_periods for use with LDMA
 }
 
 void initTIMER(void)
@@ -219,15 +224,34 @@ void initPDM(void)
 void initLDMA(void)
 {
 	LDMA_Init_t init = LDMA_INIT_DEFAULT;
-	// LDMA transfers trigger on PDM RX Data Valid
-	LDMA_TransferCfg_t periTransferTx = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_PDM_RXDATAV);
-	// Link descriptors for ping-pong transfer
-	descLink[0] =	(LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_P2M_WORD(&(PDM->RXDATA), pingBuffer, PP_BUFFER_SIZE, +1);
-	descLink[1] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_P2M_WORD(&(PDM->RXDATA), pongBuffer, PP_BUFFER_SIZE, -1);
-	// Next transfer writes to pingBuffer
-	prevBufferPing = false;
 	LDMA_Init(&init);
-	LDMA_StartTransfer(LDMA_CHANNEL, (void*) &periTransferTx, (void*) &descLink);
+
+	// PDM FIFO:
+    LDMA_TransferCfg_t periTransferTx = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_PDM_RXDATAV);
+    // Link descriptors for ping-pong transfer
+    descLink[0] =	(LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_P2M_WORD(&(PDM->RXDATA), pingBuffer, PP_BUFFER_SIZE, +1);
+    descLink[1] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_P2M_WORD(&(PDM->RXDATA), pongBuffer, PP_BUFFER_SIZE, -1);
+    // Next transfer writes to pingBuffer
+    prevBufferPing = false;
+    LDMA_StartTransfer(LDMA_PDM_CHANNEL, (void*) &periTransferTx, (void*) &descLink);
+	// TIMER COMP:
+    LDMA_TransferCfg_t transferCOMPConfig = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER0_CC1);
+    descLink[2] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_M2P_BYTE(&list_periods,
+                                                                       &(TIMER0 -> CC[1].OCB),
+                                                                       TIMER_BUFFER_SIZE,
+                                                                       0);
+    descLink[2].xfer.size = ldmaCtrlSizeHalf;
+    descLink[2].xfer.doneIfs = 0; //no interrupts for now. TODO: should change this eventually
+    LDMA_StartTransfer(LDMA_TIMER_COMP_CHANNEL, &transferCOMPConfig, &descLink[2]);
+  // TIMER TOPB
+    LDMA_TransferCfg_t transferTOPBConfig = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER0_UFOF);
+    descLink[3] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_M2P_BYTE(&list_periods,
+                                                                      &(TIMER0 -> TOPB),
+                                                                      TIMER_BUFFER_SIZE,
+                                                                      0);
+    descLink[3].xfer.size = ldmaCtrlSizeHalf;
+    descLink[3].xfer.doneIfs = 0; //no interrupts for now. TODO: should change this eventually
+    LDMA_StartTransfer(LDMA_TIMER_TOPB_CHANNEL, &transferTOPBConfig, &descLink[3]);
 }
 
 void LDMA_IRQHandler(void)
@@ -363,8 +387,8 @@ int main(void)
         printData();
         break;
       case 'p': // get list of periods
-        printf("top_values: %d\r\n", PERIOD_BUFFER_SIZE*sizeof(int));
-        binary_dump((uint8_t*)list_periods, PERIOD_BUFFER_SIZE*sizeof(uint32_t));
+        printf("top_values: %d\r\n", TIMER_BUFFER_SIZE*sizeof(int));
+        binary_dump((uint8_t*)list_periods, TIMER_BUFFER_SIZE*sizeof(uint32_t));
         printf("\r\n");
         break;
       case '0': // pulse_duration

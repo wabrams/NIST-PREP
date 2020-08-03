@@ -61,3 +61,5 @@ serial_squarewave_chirp/CMSIS/EFR32BG22/
 timer_frequency_generation/GNU ARM v7.2.1 - debug/
 listen.csv
 timer_frequency_generation/GNU ARM v7.2.1 - debug/
+*.csv
+*.csv
