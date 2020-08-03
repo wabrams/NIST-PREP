@@ -37,6 +37,7 @@ uint32_t pongBuffer[PP_BUFFER_SIZE];
 float pulse_width = 1e-3; //in sec
 int N_waves;
 uint32_t top_start, top_stop, top_value;
+uint32_t offset;
 float top_step;
 uint32_t timerFreq;
 bool play_chirp = false;
@@ -243,8 +244,25 @@ void LDMA_IRQHandler(void)
 		TIMER_Enable(TIMER0, true);
 		play_chirp=false;
 	}
-
 	prevBufferPing = !prevBufferPing;
+	if (offset < BUFFER_SIZE)
+	{
+    if (prevBufferPing)
+    {
+      for (int i = 0; i < PP_BUFFER_SIZE; i++) {
+        left[i + offset] = pingBuffer[i] & 0x0000FFFF;
+        right[i + offset] = (pingBuffer[i] >> 16) & 0x0000FFFF;
+      }
+    }
+    else
+    {
+      for (int i = 0; i < PP_BUFFER_SIZE; i++) {
+        left[offset + i] = pongBuffer[i] & 0x0000FFFF;
+        right[offset + i] = (pongBuffer[i] >> 16) & 0x0000FFFF;
+      }
+    }
+    offset += PP_BUFFER_SIZE;
+	}
 }
 
 static void initialize()
@@ -262,34 +280,13 @@ static void initialize()
 
 static void listen(bool snd)
 {
-	int offset = 0;
-	bool lastPing = prevBufferPing;
-	play_chirp=snd;
+	offset = 0;
+	play_chirp = snd;
     // memset(left, 0xFFFF, BUFFER_SIZE<<1);
     // memset(right, 0xFFFF, BUFFER_SIZE<<1);
 	while (offset < BUFFER_SIZE)
 	{
-		while (lastPing == prevBufferPing)
-		{
-			EMU_EnterEM1();
-		}
-		lastPing = prevBufferPing;
-
-		if (prevBufferPing)
-		{
-			for (int i = 0; i < PP_BUFFER_SIZE; i++) {
-				left[i + offset] = pingBuffer[i] & 0x0000FFFF;
-				right[i + offset] = (pingBuffer[i] >> 16) & 0x0000FFFF;
-			}
-		}
-		else
-		{
-			for (int i = 0; i < PP_BUFFER_SIZE; i++) {
-				left[offset + i] = pongBuffer[i] & 0x0000FFFF;
-				right[offset + i] = (pongBuffer[i] >> 16) & 0x0000FFFF;
-			}
-		}
-		offset += PP_BUFFER_SIZE;
+    EMU_EnterEM1();
 	}
 }
 
