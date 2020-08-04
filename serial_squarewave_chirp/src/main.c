@@ -113,6 +113,9 @@ void initGPIO(void)
 	GPIO_PinModeSet(gpioPortC, 7, gpioModeInput, 0);        // PDM_DATA
 	GPIO_PinModeSet(gpioPortD, 2, gpioModePushPull, 0);
 	GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0);
+	//button
+	GPIO_PinModeSet(BSP_GPIO_PB0_PORT, BSP_GPIO_PB0_PIN, gpioModeInputPullFilter, 1);
+	GPIO_IntConfig(BSP_GPIO_PB0_PORT, BSP_GPIO_PB0_PIN, false, false, false);
 	//pdm
 	GPIO_SlewrateSet(gpioPortC, 7, 7);
 	GPIO->PDMROUTE.ROUTEEN = GPIO_PDM_ROUTEEN_CLKPEN;
@@ -141,13 +144,16 @@ void initTIMER(void)
 	timer0Init.prescale = TIMER0_PRESCALE;
 	timer0Init.enable = false;
 	timer0Init.debugRun = false;
-//    timer0Init.riseAction = timerInputActionReloadStart;
+	timer0Init.fallAction = timerInputActionReloadStart;
 	TIMER_Init(TIMER0, &timer0Init);
 // TODO: PRS Input for CC0
-//  TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
-//    timer0CC0Init.mode = timerCCModeCapture;
-//    timer0CC0Init.prsInput =
-//  TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
+  TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
+    timer0CC0Init.edge = timerEdgeFalling;
+    timer0CC0Init.mode = timerCCModeCapture;
+    timer0CC0Init.prsSel = GPIO_PRS_CHANNEL;
+    timer0CC0Init.prsInput = true;
+    timer0CC0Init.prsInputType = timerPrsInputAsyncLevel;
+  TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
 
 	TIMER_InitCC_TypeDef timer0CC1Init = TIMER_INITCC_DEFAULT;
 	timer0CC1Init.mode = timerCCModePWM;
