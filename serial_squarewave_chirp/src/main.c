@@ -16,6 +16,7 @@
 
 #define DUTY_CYCLE_STEPS  0.10
 #define TARGET_DUTY_CYCLE 0.50
+#define TIMER0_PRESCALE timerPrescale1
 
 #define LDMA_PDM_CHANNEL             0
 #define LDMA_TIMER_COMP_CHANNEL      1
@@ -69,10 +70,9 @@ void calculateChirp()
   top_step = ((float) (freq_start - freq_stop)) / ((float) (freq_start * freq_stop)) * timerFreq / (numWaves - 1);
 }
 
-void setupChirp(int prescale)
+void setupChirp()
 {
   // update the variables and lists
-	timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (prescale + 1);
 	calculateChirp();
 	calculateChirpLists();
   // set first values (to be repeated)
@@ -124,7 +124,7 @@ void initRTCC(void)
 void initTIMER(void)
 {
 	TIMER_Init_TypeDef timer0Init = TIMER_INIT_DEFAULT;
-	timer0Init.prescale = timerPrescale1;
+	timer0Init.prescale = TIMER0_PRESCALE;
 	timer0Init.enable = false;
 	timer0Init.debugRun = false;
 //    timer0Init.riseAction = timerInputActionReloadStart;
@@ -138,7 +138,8 @@ void initTIMER(void)
 	timer0CC1Init.mode = timerCCModePWM;
 	TIMER_InitCC(TIMER0, 1, &timer0CC1Init);
 
-	setupChirp(timerPrescale1);
+	timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (TIMER0_PRESCALE + 1);
+	setupChirp();
 }
 
 void initPDM(void)
@@ -325,7 +326,6 @@ int main(void)
         break;
       case 'c': // chirp
         play_chirp = true;
-        // setupChirp(freq_start,  freq_stop, timerPrescale1);
         // TIMER_Enable(TIMER0, true);
         break;
       case 'i':
@@ -352,21 +352,21 @@ int main(void)
       case '0': // pulse_duration
         read_msg((uint8_t *)&pulse_width, 4);
         printf("chirp duration[ms]: %d\r\n", (int)(pulse_width*1000));
-        setupChirp(timerPrescale1);
+        setupChirp();
         printf("ack\r\n");
         RETARGET_SerialFlush();
         break;
       case '1': // start frequency
         read_msg((uint8_t*)&freq_start, 2);
         printf("start: %d\r\n", freq_start);
-        setupChirp(timerPrescale1);
+        setupChirp();
         printf("ack\r\n");
         RETARGET_SerialFlush();
         break;
       case '2': // stop frequency
         read_msg((uint8_t *)&freq_stop, 2);
         printf("stop: %d\r\n", freq_stop);
-        setupChirp(timerPrescale1);
+        setupChirp();
         printf("ack\r\n");
         RETARGET_SerialFlush();
         break;
