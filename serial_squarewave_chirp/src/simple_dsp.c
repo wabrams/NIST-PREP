@@ -43,15 +43,15 @@ void calc_chirp(int start, int stop, float pw, uint8_t *chirp, int *N)
 }
 
 // assumes x is longer than y
-void calc_cross(int16_t x, int Nx, int16_t y, int Ny, int *xy)
+void calc_cross(int16_t * x, int Nx, int16_t * y, int Ny, int *xy)
 {
 	int dot=0;
 	int16_t * tempx, * tempy, i, j;
 	for(i=0; i<(Nx-Ny+1); i++)
 	{
 		dot = 0;
-		*tempx = x+i;
-		*tempy = y;
+		tempx = x+i;
+		tempy = y;
 		for (j=0; j<Nx; j++) {
 			dot += ((*tempy++)>0) ? (*tempx++): -(*tempx++);
 			/*  Two other option... not sure what will be fastest

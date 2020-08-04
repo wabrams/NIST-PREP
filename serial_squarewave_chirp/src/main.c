@@ -11,6 +11,7 @@
 #include "em_timer.h"
 #include "em_chip.h"
 #include "em_rtcc.h"
+#include "em_prs.h"
 
 #include "retargetserial.h"
 #include "simple_dsp.h"
@@ -18,6 +19,8 @@
 #define DUTY_CYCLE_STEPS  0.10
 #define TARGET_DUTY_CYCLE 0.50
 #define TIMER0_PRESCALE timerPrescale1
+
+#define GPIO_PRS_CHANNEL    1
 
 #define LDMA_PDM_CHANNEL             0
 #define LDMA_TIMER_COMP_CHANNEL      1
@@ -83,12 +86,23 @@ void setupChirp()
 void initCMU(void)
 {
 	CMU_ClockEnable(cmuClock_GPIO, true);
+  CMU_ClockEnable(cmuClock_PRS, true);
 	CMU_ClockEnable(cmuClock_PDM, true);
 	CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL);
 	CMU_ClockEnable(cmuClock_TIMER0, true);
 	CMU_ClockSelectSet(cmuClock_TIMER0, cmuSelect_HFRCODPLL);
 	CMU_ClockEnable(cmuClock_RTCC, true);
 	CMU_ClockSelectSet(cmuClock_RTCC, cmuSelect_LFRCO);
+}
+
+void initPRS(void)
+{
+  // Select GPIO as source and button 0 GPIO pin as signal for PRS channel 0
+  PRS_SourceAsyncSignalSet(GPIO_PRS_CHANNEL, PRS_ASYNC_CH_CTRL_SOURCESEL_GPIO, BSP_GPIO_PB0_PIN);
+  // Do not apply any logic on the PRS Channel
+  PRS_Combine (GPIO_PRS_CHANNEL, GPIO_PRS_CHANNEL, prsLogic_A);
+  // Select PRS channel for Timer 0
+  PRS_ConnectConsumer(GPIO_PRS_CHANNEL, prsTypeAsync, prsConsumerTIMER0_CC0);
 }
 
 void initGPIO(void)
@@ -129,9 +143,10 @@ void initTIMER(void)
 	timer0Init.debugRun = false;
 //    timer0Init.riseAction = timerInputActionReloadStart;
 	TIMER_Init(TIMER0, &timer0Init);
-
+// TODO: PRS Input for CC0
 //  TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
 //    timer0CC0Init.mode = timerCCModeCapture;
+//    timer0CC0Init.prsInput =
 //  TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
 
 	TIMER_InitCC_TypeDef timer0CC1Init = TIMER_INITCC_DEFAULT;
@@ -253,6 +268,7 @@ static void initialize()
 	CHIP_Init();
 	// Initialize LDMA and PDM
 	initCMU();
+	initPRS();
 	initRTCC();
 	initGPIO();
 	initTIMER();
