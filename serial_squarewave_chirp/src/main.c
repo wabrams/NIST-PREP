@@ -13,6 +13,7 @@
 #include "em_rtcc.h"
 
 #include "retargetserial.h"
+#include "simple_dsp.h"
 
 #define DUTY_CYCLE_STEPS  0.10
 #define TARGET_DUTY_CYCLE 0.50
@@ -23,8 +24,7 @@
 #define LDMA_TIMER_TOPB_CHANNEL      2
 
 #define BUFFER_SIZE                 2048
-#define PP_BUFFER_SIZE               256
-#define TIMER_BUFFER_SIZE			       256
+#define PP_BUFFER_SIZE               128
 
 int freq_start = 20000;
 int freq_stop = 30000;
@@ -50,7 +50,7 @@ bool play_chirp = false;
 
 void calculateChirpLists()
 {
-  //EXTRA: clear lists, not totally necessary
+  //EXTRA: clear lists, not totally necessary (although i take advantage of this for
   memset(list_pwm, 0, TIMER_BUFFER_SIZE*sizeof(uint16_t));
   memset(list_top, 0, TIMER_BUFFER_SIZE*sizeof(uint16_t));
   // populate list using globals
@@ -66,7 +66,7 @@ void calculateChirp()
   dutyCycle = TARGET_DUTY_CYCLE; //TODO: reintroduce the tapered ends with duty cycle
   top_start = timerFreq / freq_start; // period of start frequency
   top_stop  = timerFreq / freq_stop;  // period of stop frequency
-  numWaves = (int)(pulse_width * (freq_stop + freq_start) / 2.0) % TIMER_BUFFER_SIZE; //note the modulo to keep us in bounds of the array
+  numWaves = (int)(pulse_width * (freq_stop + freq_start) / 2.0) % (TIMER_BUFFER_SIZE - 1); //note the modulo to keep us in bounds of the array, with extra for the "tail"
   top_step = ((float) (freq_start - freq_stop)) / ((float) (freq_start * freq_stop)) * timerFreq / (numWaves - 1);
 }
 
@@ -186,13 +186,13 @@ void initLDMA_TIMER(void)
   static LDMA_Descriptor_t timerCOMPLink;
   // TIMER COMP:
     LDMA_TransferCfg_t transferCOMPConfig = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER0_CC1);
-    timerCOMPLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_pwm, &(TIMER0 -> CC[1].OCB), numWaves);
+    timerCOMPLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_pwm, &(TIMER0 -> CC[1].OCB), numWaves + 1);
     timerCOMPLink.xfer.size = ldmaCtrlSizeHalf;
     timerCOMPLink.xfer.doneIfs = true;
     LDMA_StartTransfer(LDMA_TIMER_COMP_CHANNEL, &transferCOMPConfig, &timerCOMPLink);
   // TIMER TOPB:
     LDMA_TransferCfg_t transferTOPBConfig = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER0_UFOF);
-    timerTOPBLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_top, &(TIMER0 -> TOPB), numWaves);
+    timerTOPBLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_top, &(TIMER0 -> TOPB), numWaves + 1);
     timerTOPBLink.xfer.size = ldmaCtrlSizeHalf;
     timerTOPBLink.xfer.doneIfs = true;
     LDMA_StartTransfer(LDMA_TIMER_TOPB_CHANNEL, &transferTOPBConfig, &timerTOPBLink);
