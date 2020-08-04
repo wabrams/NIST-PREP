@@ -35,8 +35,8 @@ uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
 bool prevBufferPing;
 
-uint32_t list_pwm[TIMER_BUFFER_SIZE];
-uint32_t list_top[TIMER_BUFFER_SIZE];
+uint16_t list_pwm[TIMER_BUFFER_SIZE];
+uint16_t list_top[TIMER_BUFFER_SIZE];
 
 float pulse_width = 5e-3; //in sec
 float dutyCycle = 0;
@@ -50,8 +50,8 @@ bool play_chirp = false;
 void calculateChirpLists()
 {
   //EXTRA: clear lists, not totally necessary
-  memset(list_pwm, 0, TIMER_BUFFER_SIZE*sizeof(uint32_t));
-  memset(list_top, 0, TIMER_BUFFER_SIZE*sizeof(uint32_t));
+  memset(list_pwm, 0, TIMER_BUFFER_SIZE*sizeof(uint16_t));
+  memset(list_top, 0, TIMER_BUFFER_SIZE*sizeof(uint16_t));
   // populate list using globals
   for (int i = 0; i < numWaves; i++)
   {
@@ -162,31 +162,37 @@ void initPDM(void)
 
 void initLDMA(void)
 {
-  static LDMA_Descriptor_t descLink[2];
-  static LDMA_Descriptor_t timerTOPBLink;
-  static LDMA_Descriptor_t timerCOMPLink;
-
 	LDMA_Init_t init = LDMA_INIT_DEFAULT;
 	LDMA_Init(&init);
+}
 
-	// PDM FIFO:
+void initLDMA_PDM(void)
+{
+  static LDMA_Descriptor_t descLink[2];
+  // PDM FIFO:
     LDMA_TransferCfg_t periTransferTx = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_PDM_RXDATAV);
     // Link descriptors for ping-pong transfer
-    descLink[0] =	(LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_P2M_WORD(&(PDM->RXDATA), pingBuffer, PP_BUFFER_SIZE, +1);
+    descLink[0] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_P2M_WORD(&(PDM->RXDATA), pingBuffer, PP_BUFFER_SIZE, +1);
     descLink[1] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_P2M_WORD(&(PDM->RXDATA), pongBuffer, PP_BUFFER_SIZE, -1);
     // Next transfer writes to pingBuffer
     prevBufferPing = false;
     LDMA_StartTransfer(LDMA_PDM_CHANNEL, (void*) &periTransferTx, (void*) &descLink);
-	// TIMER COMP:
+}
+
+void initLDMA_TIMER(void)
+{
+  static LDMA_Descriptor_t timerTOPBLink;
+  static LDMA_Descriptor_t timerCOMPLink;
+  // TIMER COMP:
     LDMA_TransferCfg_t transferCOMPConfig = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER0_CC1);
     timerCOMPLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_pwm, &(TIMER0 -> CC[1].OCB), numWaves);
-    timerCOMPLink.xfer.size = ldmaCtrlSizeWord;
+    timerCOMPLink.xfer.size = ldmaCtrlSizeHalf;
     timerCOMPLink.xfer.doneIfs = true;
     LDMA_StartTransfer(LDMA_TIMER_COMP_CHANNEL, &transferCOMPConfig, &timerCOMPLink);
   // TIMER TOPB:
     LDMA_TransferCfg_t transferTOPBConfig = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER0_UFOF);
     timerTOPBLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_top, &(TIMER0 -> TOPB), numWaves);
-    timerTOPBLink.xfer.size = ldmaCtrlSizeWord;
+    timerTOPBLink.xfer.size = ldmaCtrlSizeHalf;
     timerTOPBLink.xfer.doneIfs = true;
     LDMA_StartTransfer(LDMA_TIMER_TOPB_CHANNEL, &transferTOPBConfig, &timerTOPBLink);
 }
@@ -230,13 +236,14 @@ void LDMA_IRQHandler(void)
 	}
 	if (pending & LDMA_CHDONE_CHDONE1)
 	{
-//	  LDMA_StopTransfer(1);
+	  LDMA_StopTransfer(1);
 	}
 	if (pending & LDMA_CHDONE_CHDONE2)
 	{
-//	  LDMA_StopTransfer(2);
+	  LDMA_StopTransfer(2);
+	  TIMER_Enable(TIMER0, false);
+	  initLDMA_TIMER();
 	}
-
 }
 
 static void initialize()
@@ -250,6 +257,8 @@ static void initialize()
 	initTIMER();
 	initPDM();
 	initLDMA();
+	initLDMA_PDM();
+	initLDMA_TIMER();
 }
 
 static void listen(bool snd)
