@@ -191,31 +191,16 @@ void initLDMA(void)
     LDMA_StartTransfer(LDMA_TIMER_TOPB_CHANNEL, &transferTOPBConfig, &timerTOPBLink);
 }
 
-void LDMA_IRQHandler(void)
+static inline void listenPass()
 {
-	uint32_t pending = LDMA_IntGet();
-	LDMA_IntClear(pending);
-    // static bool wait = true;
-	if (pending & LDMA_IF_ERROR)
-	{
-		while (1); //TODO: assert here
-	}
-	if (pending & LDMA_IF_DONE1)
-	{
-	  LDMA_StopTransfer(1);
-	}
-	if (pending & LDMA_IF_DONE2)
-	{
-	  LDMA_StopTransfer(2);
-	}
-	if (play_chirp)
-	{
-		TIMER_Enable(TIMER0, true);
-		play_chirp=false;
-	}
-	prevBufferPing = !prevBufferPing;
-	if (offset < BUFFER_SIZE)
-	{
+  if (play_chirp)
+  {
+    TIMER_Enable(TIMER0, true);
+    play_chirp=false;
+  }
+  prevBufferPing = !prevBufferPing;
+  if (offset < BUFFER_SIZE)
+  {
     if (prevBufferPing)
     {
       for (int i = 0; i < PP_BUFFER_SIZE; i++) {
@@ -231,7 +216,27 @@ void LDMA_IRQHandler(void)
       }
     }
     offset += PP_BUFFER_SIZE;
+  }
+}
+
+void LDMA_IRQHandler(void)
+{
+	uint32_t pending = LDMA -> IF_CLR = LDMA -> IF;
+  EFM_ASSERT(!(pending & LDMA_IF_ERROR));
+
+	if (pending & LDMA_CHDONE_CHDONE0)
+	{
+	  listenPass();
 	}
+	if (pending & LDMA_CHDONE_CHDONE1)
+	{
+//	  LDMA_StopTransfer(1);
+	}
+	if (pending & LDMA_CHDONE_CHDONE2)
+	{
+//	  LDMA_StopTransfer(2);
+	}
+
 }
 
 static void initialize()
@@ -260,7 +265,7 @@ static void listen(bool snd)
 
 void binary_dump(uint8_t * buffer, int length)
 {
-	uint8_t* temp = buffer;
+	uint8_t * temp = buffer;
 	for (int i = 0; i < length; i++) {
 		RETARGET_WriteChar(*temp++);
 	}
