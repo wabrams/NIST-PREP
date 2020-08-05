@@ -24,7 +24,7 @@ void initPDM(void);
 void initLDMA(void);
 void startLDMA_PDM(void);
 void startLDMA_TIMER(void);
-void listen(bool snd);
+void listen();
 void init_usound();
 void LDMA_IRQHandler(void);
 

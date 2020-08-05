@@ -19,7 +19,7 @@ void calc_chirp(int start, int stop, float pw, uint8_t * chirp, int * N)
   int index = 0;
   int halfway = 0;
   int period;
-  int prescale = 32*6;
+  int prescale = 32 * 6;
   uint16_t list[TIMER_BUFFER_SIZE];
   int N_list=0;
 
@@ -27,17 +27,17 @@ void calc_chirp(int start, int stop, float pw, uint8_t * chirp, int * N)
   // printf("period_list_length: %d\r\n", N_list);
   for (int i=0; i<N_list; i++)
   {
-    period = list[i];
     // look at current period
+    period = list[i];
     // if in first half of period, set 1
     halfway = period >> 1;
-    while (time<(offset + halfway))
+    while (time < (offset + halfway))
     {
         chirp[index] = 1;
         index++;
         time += prescale;
     }
-    while (time<(offset+period))
+    while (time < (offset+period))
     {
         chirp[index] = 0;
         index++;

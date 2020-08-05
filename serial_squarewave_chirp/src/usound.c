@@ -46,8 +46,10 @@ uint32_t top_start;                                     /**< Calculated: Top Val
 uint32_t top_stop;                                      /**< Calculated: Top Value for TIMER, for freq_stop  **/
 uint32_t top_value;                                     /**<  **/
 uint32_t timerFreq;                                     /**< Constant: Calculating using TIMER_PDM's maximum frequency and prescale value **/
-bool play_chirp = false;                                /**<  **/
+bool usound_spk = false;                                /**<  **/
+bool usound_lst = false;                                /**<  **/
 
+uint32_t tick_pdm_start;
 uint32_t start, stop, durr, measured_ms;
 
 void setupChirp()
@@ -172,15 +174,21 @@ void startLDMA_TIMER(void)
   LDMA_StartTransfer(LDMA_TIMER_TOPB_CHANNEL, &transferTOPBConfig, &timerTOPBLink);
 }
 
-static inline void listenPass()
+static inline void handleLDMA_PDM()
 {
-  if (play_chirp)
+  if (usound_spk)
   {
     TIMER_Enable(TIMER_PDM, true);
-    play_chirp=false;
+    usound_spk = false;
   }
   prevBufferPing = !prevBufferPing;
-  if (offset < BUFFER_SIZE)
+  if (usound_lst)
+  {
+    offset = 0;
+    tick_pdm_start = RTCC_CounterGet();
+    usound_lst = false;
+  }
+  else if (offset < BUFFER_SIZE)
   {
     if (prevBufferPing)
     {
@@ -200,11 +208,8 @@ static inline void listenPass()
   }
 }
 
-void listen(bool snd)
+void listen()
 {
-  offset = 0;
-  play_chirp = snd;
-
   while (offset < BUFFER_SIZE)
   {
     EMU_EnterEM1();
@@ -218,7 +223,7 @@ void LDMA_IRQHandler(void)
 
   if (pending & LDMA_CHDONE_CHDONE0)
   {
-    listenPass();
+    handleLDMA_PDM();
   }
   if (pending & LDMA_CHDONE_CHDONE1)
   {
@@ -228,7 +233,6 @@ void LDMA_IRQHandler(void)
   {
     LDMA_StopTransfer(2);
     TIMER_Enable(TIMER_PDM, false);
-    //TODO: RTCC time how long it takes LDMA for TIMER to get back up
     startLDMA_TIMER();
   }
 }
@@ -297,15 +301,15 @@ void read_ser(char c)
   switch (c)
   {
     case 'a': // all (chirp + listen, transmit)
-      listen(true);
-      // play_chirp = true;
+      usound_lst = usound_spk = true;
+      listen();
       printData();
       break;
     case 'b': // all (chirp + listen, transmit)
-      listen(true);
+      usound_lst = usound_spk = true;
+      listen();
       printData();
-      calc_chirp(freq_start, freq_stop, pulse_width, pdm_template,
-          &N_pdm_template);
+      calc_chirp(freq_start, freq_stop, pulse_width, pdm_template, &N_pdm_template);
       start = RTCC_CounterGet();
       calc_cross(left, BUFFER_SIZE, pdm_template, N_pdm_template, corr_left);
       stop = RTCC_CounterGet(); //new
@@ -315,16 +319,15 @@ void read_ser(char c)
       printCorr();
       break;
     case 'c': // chirp
-      play_chirp = true;
+      usound_spk = true;
       break;
     case 'i':
       break;
     case 'l': // listen
-      listen(false);
+      usound_lst = true;
       break;
     case 'r': // record (chirp + listen)
-      listen(true);
-      // play_chirp = true;
+      usound_lst = usound_spk = true;
       break;
     case 's': // sample numbers
       printf("samp\r\n%d\r\n", BUFFER_SIZE);

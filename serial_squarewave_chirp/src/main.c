@@ -38,8 +38,8 @@ void initGPIO(void)
   GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 1);     // MIC_EN
   GPIO_PinModeSet(gpioPortC, 6, gpioModePushPull, 0);     // PDM_CLK
   GPIO_PinModeSet(gpioPortC, 7, gpioModeInput,    0);     // PDM_DATA
-  GPIO_PinModeSet(gpioPortD, 2, gpioModePushPull, 0);
-  GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0);
+  GPIO_PinModeSet(gpioPortD, 2, gpioModePushPull, 0);     // SPKR_NEG (used for differential drive, not currently configured)
+  GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0);     // SPKR_POS
   //button
   GPIO_PinModeSet(BSP_GPIO_PB0_PORT, BSP_GPIO_PB0_PIN, gpioModeInputPullFilter, 1);
   GPIO_IntConfig(BSP_GPIO_PB0_PORT, BSP_GPIO_PB0_PIN, false, false, false);
