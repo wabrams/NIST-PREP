@@ -3,7 +3,11 @@
 
 #define DUTY_CYCLE_STEPS  0.10
 #define TARGET_DUTY_CYCLE 0.50
-#define TIMER0_PRESCALE timerPrescale1
+#define TIMER_PDM           TIMER0
+#define TIMER_PDM_CLK       cmuClock_TIMER0
+#define TIMER_PDM_PRESCALE  timerPrescale1
+#define TIMER_PDM_LDMA_COMP ldmaPeripheralSignal_TIMER0_CC1
+#define TIMER_PDM_LDMA_TOPV ldmaPeripheralSignal_TIMER0_UFOF
 
 #define GPIO_PRS_CHANNEL    1
 

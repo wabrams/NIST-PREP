@@ -18,7 +18,6 @@
 #include "simple_dsp.h"
 #include "usound.h"
 
-
 int freq_start = 20000;                                 /**< Starting Frequency for Square Chirp, in Hz **/
 int freq_stop = 30000;                                  /**< Stopping Frequency for Square Chirp, in Hz **/
 
@@ -45,7 +44,7 @@ float top_step;                                         /**< Calculated: Top Val
 uint32_t top_start;                                     /**< Calculated: Top Value for TIMER, for freq_start **/
 uint32_t top_stop;                                      /**< Calculated: Top Value for TIMER, for freq_stop  **/
 uint32_t top_value;                                     /**<  **/
-uint32_t timerFreq;                                     /**< Constant: Calculating using TIMER0's maximum frequency and prescale value **/
+uint32_t timerFreq;                                     /**< Constant: Calculating using TIMER_PDM's maximum frequency and prescale value **/
 bool play_chirp = false;                                /**<  **/
 
 void setupChirp()
@@ -83,32 +82,32 @@ void setupChirp()
     }
   }
   // set first values (to be repeated)
-//  TIMER_TopBufSet(TIMER0, top_start);
-//  TIMER_CompareBufSet(TIMER0, 1, (uint32_t) (top_start * DUTY_CYCLE_STEPS));
+//  TIMER_TopBufSet(TIMER_PDM, top_start);
+//  TIMER_CompareBufSet(TIMER_PDM, 1, (uint32_t) (top_start * DUTY_CYCLE_STEPS));
 }
 
 void initTIMER(void)
 {
-  TIMER_Init_TypeDef timer0Init = TIMER_INIT_DEFAULT;
-  timer0Init.prescale = TIMER0_PRESCALE;
-  timer0Init.enable = false;
-  timer0Init.debugRun = false;
-  timer0Init.fallAction = timerInputActionReloadStart;
-  TIMER_Init(TIMER0, &timer0Init);
+  TIMER_Init_TypeDef timerInit = TIMER_INIT_DEFAULT;
+  timerInit.prescale = TIMER_PDM_PRESCALE;
+  timerInit.enable = false;
+  timerInit.debugRun = false;
+  timerInit.fallAction = timerInputActionReloadStart;
+  TIMER_Init(TIMER_PDM, &timerInit);
 
-  TIMER_InitCC_TypeDef timer0CC0Init = TIMER_INITCC_DEFAULT;
-    timer0CC0Init.edge = timerEdgeFalling;
-    timer0CC0Init.mode = timerCCModeCapture;
-    timer0CC0Init.prsSel = GPIO_PRS_CHANNEL;
-    timer0CC0Init.prsInput = true;
-    timer0CC0Init.prsInputType = timerPrsInputAsyncLevel;
-  TIMER_InitCC(TIMER0, 0, &timer0CC0Init);
+  TIMER_InitCC_TypeDef timerCC0Init = TIMER_INITCC_DEFAULT;
+    timerCC0Init.edge = timerEdgeFalling;
+    timerCC0Init.mode = timerCCModeCapture;
+    timerCC0Init.prsSel = GPIO_PRS_CHANNEL;
+    timerCC0Init.prsInput = true;
+    timerCC0Init.prsInputType = timerPrsInputAsyncLevel;
+  TIMER_InitCC(TIMER_PDM, 0, &timerCC0Init);
 
-  TIMER_InitCC_TypeDef timer0CC1Init = TIMER_INITCC_DEFAULT;
-  timer0CC1Init.mode = timerCCModePWM;
-  TIMER_InitCC(TIMER0, 1, &timer0CC1Init);
+  TIMER_InitCC_TypeDef timerCC1Init = TIMER_INITCC_DEFAULT;
+  timerCC1Init.mode = timerCCModePWM;
+  TIMER_InitCC(TIMER_PDM, 1, &timerCC1Init);
 
-  timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (TIMER0_PRESCALE + 1);
+  timerFreq = CMU_ClockFreqGet(TIMER_PDM_CLK) / (TIMER_PDM_PRESCALE + 1);
 }
 
 void initPDM(void)
@@ -156,14 +155,15 @@ void startLDMA_TIMER(void)
   static LDMA_Descriptor_t timerCOMPLink;
 
   // TIMER COMP:
-  LDMA_TransferCfg_t transferCOMPConfig = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER0_CC1);
-  timerCOMPLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_pwm, &(TIMER0 -> CC[1].OCB), numWaves + 1);
+  LDMA_TransferCfg_t transferCOMPConfig = LDMA_TRANSFER_CFG_PERIPHERAL(TIMER_PDM_LDMA_COMP);
+  timerCOMPLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_pwm, &(TIMER_PDM -> CC[1].OCB), numWaves + 1);
   timerCOMPLink.xfer.size = ldmaCtrlSizeHalf;
   timerCOMPLink.xfer.doneIfs = true;
   LDMA_StartTransfer(LDMA_TIMER_COMP_CHANNEL, &transferCOMPConfig, &timerCOMPLink);
+
   // TIMER TOPB:
-  LDMA_TransferCfg_t transferTOPBConfig = LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER0_UFOF);
-  timerTOPBLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_top, &(TIMER0 -> TOPB), numWaves + 1);
+  LDMA_TransferCfg_t transferTOPBConfig = LDMA_TRANSFER_CFG_PERIPHERAL(TIMER_PDM_LDMA_TOPV);
+  timerTOPBLink = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&list_top, &(TIMER_PDM -> TOPB), numWaves + 1);
   timerTOPBLink.xfer.size = ldmaCtrlSizeHalf;
   timerTOPBLink.xfer.doneIfs = true;
   LDMA_StartTransfer(LDMA_TIMER_TOPB_CHANNEL, &transferTOPBConfig, &timerTOPBLink);
@@ -173,7 +173,7 @@ static inline void listenPass()
 {
   if (play_chirp)
   {
-    TIMER_Enable(TIMER0, true);
+    TIMER_Enable(TIMER_PDM, true);
     play_chirp=false;
   }
   prevBufferPing = !prevBufferPing;
@@ -224,7 +224,8 @@ void LDMA_IRQHandler(void)
   if (pending & LDMA_CHDONE_CHDONE2)
   {
     LDMA_StopTransfer(2);
-    TIMER_Enable(TIMER0, false);
+    TIMER_Enable(TIMER_PDM, false);
+    //TODO: RTCC time how long it takes LDMA for TIMER to get back up
     startLDMA_TIMER();
   }
 }
@@ -307,7 +308,6 @@ void read_ser(char c)
       break;
     case 'c': // chirp
       play_chirp = true;
-      // TIMER_Enable(TIMER0, true);
       break;
     case 'i':
       break;

@@ -67,16 +67,20 @@ void initRTCC(void)
 
 int main(void)
 {
+  //retarget to serial port
 	RETARGET_SerialCrLf(0);
   printf("Hello World wait\r\n");
   RETARGET_SerialFlush();
 
+  //initialize heavies
   initCMU();
   initPRS();
   initRTCC();
   initGPIO();
+  //initialize usound
   init_usound();
 
+  //waiting for serial
 	char c = 'i';
 	do
 	{
