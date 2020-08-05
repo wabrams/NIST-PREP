@@ -13,6 +13,7 @@
 #include "em_pdm.h"
 #include "em_device.h"
 #include "em_timer.h"
+#include "em_rtcc.h"
 
 #include "retargetserial.h"
 #include "simple_dsp.h"
@@ -46,6 +47,8 @@ uint32_t top_stop;                                      /**< Calculated: Top Val
 uint32_t top_value;                                     /**<  **/
 uint32_t timerFreq;                                     /**< Constant: Calculating using TIMER_PDM's maximum frequency and prescale value **/
 bool play_chirp = false;                                /**<  **/
+
+uint32_t start, stop, durr, measured_ms;
 
 void setupChirp()
 {
@@ -301,8 +304,13 @@ void read_ser(char c)
     case 'b': // all (chirp + listen, transmit)
       listen(true);
       printData();
-      calc_chirp(freq_start, freq_stop, pulse_width, pdm_template, &N_pdm_template);
+      calc_chirp(freq_start, freq_stop, pulse_width, pdm_template,
+          &N_pdm_template);
+      start = RTCC_CounterGet();
       calc_cross(left, BUFFER_SIZE, pdm_template, N_pdm_template, corr_left);
+      stop = RTCC_CounterGet(); //new
+      durr = stop - start; //new
+      measured_ms = durr * 0.0305; //new
       calc_cross(right, BUFFER_SIZE, pdm_template, N_pdm_template, corr_right);
       printCorr();
       break;
