@@ -4,7 +4,7 @@ void calculate_periods_list(int start, int stop, float pw, uint16_t * list, int 
 {
   int timerFreq = CMU_ClockFreqGet(cmuClock_TIMER0) / (0 + 1);
   int top_start = (int)(timerFreq / start);
-  *N = (int) (2.0 * pw * (start*stop) / (stop + start));
+  *N = (int) (2 * (start*stop) / (stop + start) * pw);
   float top_step = (1.0 * (start - stop)) / (start * stop) * timerFreq / (*N - 1);
   for (int i=0; i<*N; i++)
   {

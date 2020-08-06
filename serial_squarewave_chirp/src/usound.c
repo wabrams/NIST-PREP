@@ -86,9 +86,8 @@ void setupChirp()
       list_pwm[numWaves - 1 - i] = prev * list_top[numWaves-1-i];
     }
   }
-  // set first values (to be repeated)
-//  TIMER_TopBufSet(TIMER_PDM, top_start);
-//  TIMER_CompareBufSet(TIMER_PDM, 1, (uint32_t) (top_start * DUTY_CYCLE_STEPS));
+
+  startLDMA_TIMER();
 }
 
 void initTIMER(void)
@@ -244,10 +243,9 @@ void init_usound()
   // Initialize Peripherals
   initTIMER();
   initPDM();
-  initLDMA();
-  startLDMA_PDM();
-  startLDMA_TIMER();
+  initLDMA(); //TODO: setup LDMA before PDM, then call LDMA_PDM() inside of initPDM()
   setupChirp();
+  startLDMA_PDM();
 }
 
 void binary_dump(uint8_t * buffer, int length)
