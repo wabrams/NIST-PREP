@@ -30,29 +30,38 @@
 #include "em_gpio.h"
 #include "em_device.h"
 #include "em_ldma.h"
+#include "em_timer.h"
 #include "dmadrv.h"
 
-#include "em_timer.h"
-
 #include "gpiointerrupt.h"
+#include "simple_dsp.h"
 
 #define RX_OBS_PRS_CHANNEL   0
 #define TX_OBS_PRS_CHANNEL   1
 
-#define LR_BUFFER_SIZE     512
-#define PP_BUFFER_SIZE     128
+#define TM_BUFFER_SIZE     256    /**< Size of Buffer for TIMER COMP and TOPV values **/
+#define LR_BUFFER_SIZE     1024    /**< Size of Buffer for Left and Right PDM arrays  **/
+#define PP_BUFFER_SIZE     128    /**< Size of Buffer for Ping and Pong LDMA arrays  **/
+
+#define PWM_FREQ 10000
+
+uint16_t list_top[TM_BUFFER_SIZE];
+uint16_t list_pwm[TM_BUFFER_SIZE];
+int numWaves = TM_BUFFER_SIZE; //TODO: this should resize, once we add the DSP code
 
 int16_t left [LR_BUFFER_SIZE];
 int16_t right[LR_BUFFER_SIZE];
+int offset = 0;
+
 uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
 bool prevBufferPing = false;
-int offset = 0;
 
-volatile bool on_off = false;
+uint32_t timerFreq;
 
-//void startLDMA(void);
-void startDMADRV(void);
+unsigned int channelTMR_TOPV, channelTMR_COMP, channelPDM;
+
+void startDMADRV_TMR(void);
 
 static inline void printLR()
 {
@@ -78,13 +87,13 @@ void button0Callback(uint8_t pin)
     printLR();
     offset = 0;
   }
-  startDMADRV();
+  startDMADRV_TMR();
   TIMER_Enable(TIMER1, true);
 }
 
-void initGpio(void)
+void initGPIO(void)
 {
-  GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0);
+  GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0); // SPKR_PIN
   // Button stuff
   GPIO_PinModeSet(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN, gpioModeInputPullFilter, 1);
   GPIOINT_Init();
@@ -101,96 +110,74 @@ void initGpio(void)
   GPIO->PDMROUTE.CLKROUTE  = (gpioPortC << _GPIO_PDM_CLKROUTE_PORT_SHIFT)  | (6 << _GPIO_PDM_CLKROUTE_PIN_SHIFT);
   GPIO->PDMROUTE.DAT0ROUTE = (gpioPortC << _GPIO_PDM_DAT0ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT0ROUTE_PIN_SHIFT);
   GPIO->PDMROUTE.DAT1ROUTE = (gpioPortC << _GPIO_PDM_DAT1ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT1ROUTE_PIN_SHIFT);
+  // PWM STUFF
+  GPIO->TIMERROUTE[1].ROUTEEN = GPIO_TIMER_ROUTEEN_CC0PEN;
+  GPIO->TIMERROUTE[1].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT) | (3 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
 }
 
-void initCmu(void)
+void initCMU(void)
 {
-  // Enable clock to GPIO and TIMER1
   CMU_ClockEnable(cmuClock_GPIO, true);
   CMU_ClockEnable(cmuClock_TIMER1, true);
   CMU_ClockEnable(cmuClock_PDM, true);
 }
 
-#define PWM_FREQ 1000
-// Buffer size
-#define BUFFER_SIZE 11
-static const uint16_t dutyCyclePercentages[BUFFER_SIZE] =
-// { 5, 8, 10, 10, 8, 5, 2, 0, 0, 2 };
-// {0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
-// {100, 0, 100, 0, 100, 0, 100, 0, 100, 0, 100};
-    { 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50 };
 
-// Buffer of duty cycle values for DMA transfer to CCVB
-// Buffer is populated after TIMER is initialized and Top value is set
-static uint16_t buffer[BUFFER_SIZE];
-
-void populateBuffer(void)
+void populateBuffers(void)
 {
-  for (uint32_t i = 0; i < BUFFER_SIZE; i++)
-    buffer[i] = (uint16_t) (TIMER_TopGet(TIMER1) * dutyCyclePercentages[i] / 100);
+  int freq_start = 20000;
+  int freq_stop  = 30000;
+  float pulse_width = 5e-3;
+  calculate_periods_list(freq_start, freq_stop, pulse_width, list_top, &numWaves);
+  for (uint32_t i = 0; i < numWaves; i++)
+  {
+    list_pwm[i] = list_top[i] * 0.5;
+  }
 }
 
-void initTimer(void)
+void initTIMER(void)
 {
-  // Initialize and start timer with no prescaling
   TIMER_Init_TypeDef timerInit = TIMER_INIT_DEFAULT;
-  // Configure TIMER1 Compare/Capture for output compare
-  TIMER_InitCC_TypeDef timerCCInit = TIMER_INITCC_DEFAULT;
-
-  // Use PWM mode, which sets output on overflow and clears on compare events
-  timerInit.enable = false;
-  timerCCInit.mode = timerCCModePWM;
-
-  // Configure but do not start the timer
+    timerInit.enable = false;
   TIMER_Init(TIMER1, &timerInit);
 
-  // Route TIMER1 CC0 output to PA6
-  GPIO->TIMERROUTE[1].ROUTEEN = GPIO_TIMER_ROUTEEN_CC0PEN;
-  GPIO->TIMERROUTE[1].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT)
-      | (3 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
-  /*
-   (gpioPortA << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT)
-   | (6 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
-   */
+  TIMER_InitCC_TypeDef timerCCInit = TIMER_INITCC_DEFAULT;
+    timerCCInit.mode = timerCCModePWM;
   TIMER_InitCC(TIMER1, 0, &timerCCInit);
 
   // Set top value to overflow at the desired PWM_FREQ frequency
-  TIMER_TopSet(TIMER1, CMU_ClockFreqGet(cmuClock_TIMER1) / PWM_FREQ);
-
-  // Start the timer
-  // TIMER_Enable(TIMER1, true);
-
+  timerFreq = CMU_ClockFreqGet(cmuClock_TIMER1);
   // Trigger DMA on compare event to set CCVB to update duty cycle on next period
   TIMER_IntEnable(TIMER1, TIMER_IEN_CC0);
 }
 
 void initPDM(void)
 {
-  // Config PDM
   PDM -> CFG0 = PDM_CFG0_STEREOMODECH01_CH01ENABLE | PDM_CFG0_CH0CLKPOL_NORMAL
             | PDM_CFG0_CH1CLKPOL_INVERT | PDM_CFG0_FIFODVL_FOUR
             | PDM_CFG0_DATAFORMAT_DOUBLE16 | PDM_CFG0_NUMCH_TWO
             | PDM_CFG0_FORDER_FIFTH;
   PDM -> CFG1 = (5 << _PDM_CFG1_PRESC_SHIFT);
-  // Enable module
   PDM -> EN = PDM_EN_EN;
-  // Start filter
   while (PDM -> SYNCBUSY);
   PDM -> CMD = PDM_CMD_START;
-  // Config DSR/Gain
   while (PDM -> SYNCBUSY);
-  // Changed: From 3 to 8
   PDM -> CTRL = (8 << _PDM_CTRL_GAIN_SHIFT) | (32 << _PDM_CTRL_DSR_SHIFT);
 }
 
-unsigned int channel, channelPDM;
-bool dma_cb(unsigned int channel, unsigned int sequenceNo, void *userParam)
-{
-  printLog("dma_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
-  TIMER_Enable(TIMER1, false);
 
-  return 0;
+void dma_tmr_topv_cb(unsigned int channel, unsigned int sequenceNo, void *userParam)
+{
+  printLog("tmr_topv_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
+//  TIMER_Enable(TIMER1, false);
 }
+
+void dma_tmr_comp_cb(unsigned int channel, unsigned int sequenceNo, void *userParam)
+{
+  printLog("tmr_comp_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
+  TIMER_Enable(TIMER1, false);
+}
+
 void dma_pdm_cb(unsigned int channel, unsigned int sequenceNo, void * userParam)
 {
   prevBufferPing = !prevBufferPing;
@@ -214,37 +201,24 @@ void dma_pdm_cb(unsigned int channel, unsigned int sequenceNo, void * userParam)
     offset += PP_BUFFER_SIZE;
   }
 }
-void startDMADRV(void)
+
+void startDMADRV_TMR(void)
 {
-  DMADRV_MemoryPeripheral(channel, dmadrvPeripheralSignal_TIMER1_CC0, &TIMER1->CC[0].OCB,
-      &buffer, true, BUFFER_SIZE, dmadrvDataSize2, dma_cb, NULL);
+  //TOPV
+  DMADRV_MemoryPeripheral(channelTMR_TOPV, dmadrvPeripheralSignal_TIMER1_UFOF, &TIMER1 -> TOPB,
+      list_top, true, numWaves, dmadrvDataSize2, dma_tmr_topv_cb, NULL);
+  //COMP
+  DMADRV_MemoryPeripheral(channelTMR_COMP, dmadrvPeripheralSignal_TIMER1_CC0, &TIMER1->CC[0].OCB,
+      list_pwm, true, numWaves, dmadrvDataSize2, dma_tmr_comp_cb, NULL);
 }
+
 void startDMADRV_PDM(void)
 {
   DMADRV_PeripheralMemoryPingPong(channelPDM, dmadrvPeripheralSignal_PDM_RXDATAV, pingBuffer, pongBuffer,
       &(PDM->RXDATA), true, PP_BUFFER_SIZE, dmadrvDataSize4, dma_pdm_cb, NULL);
 }
-//void startLDMA(void)
-//{
-//  // Start the transfer
-//  uint32_t channelNum = 0;
-//  // Transfer configuration and trigger selection
-//  LDMA_TransferCfg_t transferConfig =
-//      LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER1_CC0);
-//  // Channel descriptor configuration
-//  static LDMA_Descriptor_t descriptor =
-//      LDMA_DESCRIPTOR_SINGLE_M2P_BYTE(&buffer, &TIMER1->CC[0].OCB, BUFFER_SIZE);
-//  descriptor.xfer.size = ldmaCtrlSizeHalf;
-//  descriptor.xfer.doneIfs = 0;
-//
-//  // LDMA_StartTransfer(channelNum, &transferConfig, &descriptor);
-//  DMADRV_LdmaStartTransfer(channel, &transferConfig, &descriptor, dma_cb,
-//  NULL);
-//
-//}
 
-void enableDebugGpios(GPIO_Port_TypeDef rx_obs_port, uint8_t rx_obs_pin,
-    GPIO_Port_TypeDef tx_obs_port, uint8_t tx_obs_pin)
+void enableDebugGpios(GPIO_Port_TypeDef rx_obs_port, uint8_t rx_obs_pin, GPIO_Port_TypeDef tx_obs_port, uint8_t tx_obs_pin)
 {
   // Turn on the PRS and GPIO clocks to access their registers.
   // Configure pins as output.
@@ -290,7 +264,7 @@ void enableDebugGpios(GPIO_Port_TypeDef rx_obs_port, uint8_t rx_obs_pin,
 #endif
 }
 /* Print boot message */
-static void bootMessage(struct gecko_msg_system_boot_evt_t *bootevt);
+static void bootMessage(struct gecko_msg_system_boot_evt_t * bootevt);
 
 /* Flag for indicating DFU Reset must be performed */
 static uint8_t boot_to_dfu = 0;
@@ -304,13 +278,13 @@ void appMain(gecko_configuration_t *pconfig)
 
   /* Initialize debug prints. Note: debug prints are off by default. See DEBUG_LEVEL in app.h */
   initLog();
-  initGpio();
-  initCmu();
-  initTimer();
+  initGPIO();
+  initCMU();
+  initTIMER();
   initPDM();
 
   // Initialize DMA only after buffer is populated
-  populateBuffer();
+  populateBuffers();
   DMADRV_Init();
 
   /* Initialize stack */
@@ -348,12 +322,13 @@ void appMain(gecko_configuration_t *pconfig)
        * units of (milliseconds * 1.6).
        * The last two parameters are duration and maxevents left as default. */
 
-      uint32_t e1 = DMADRV_AllocateChannel(&channel, NULL);
-      printLog("DMADRV channel %d, retcode: %lu\r\n", channel, e1);
+      uint32_t e0 = DMADRV_AllocateChannel(&channelTMR_TOPV, NULL);
+      printLog("DMADRV channel %d, retcode: %lu\r\n", channelTMR_TOPV, e0);
+      uint32_t e1 = DMADRV_AllocateChannel(&channelTMR_COMP, NULL);
+      printLog("DMADRV channel %d, retcode: %lu\r\n", channelTMR_COMP, e1);
       uint32_t e2 = DMADRV_AllocateChannel(&channelPDM, NULL);
       printLog("DMADRV channel %d, retcode: %lu\r\n", channelPDM, e2);
-
-      startDMADRV();
+      startDMADRV_TMR();
       startDMADRV_PDM();
       gecko_cmd_le_gap_set_advertise_timing(0, 10 * 160, 10 * 160, 0, 0);
 

@@ -1,10 +1,5 @@
-app.o: ../app.c \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_types.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\soc/native_gecko.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/hal-config.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/board_features.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/ble-configuration.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\hardware\kit\EFR32BG22_BRD4184A\config/hal-config-board.h \
+simple_dsp.o: ../simple_dsp.c ../simple_dsp.h \
+ C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_cmu.h \
  C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\Device\SiliconLabs\EFR32BG22\Include/em_device.h \
  C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\Device\SiliconLabs\EFR32BG22\Include/efr32bg22c224f512im40.h \
  C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\CMSIS\Include/core_cm33.h \
@@ -61,43 +56,14 @@ app.o: ../app.c \
  C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\Device\SiliconLabs\EFR32BG22\Include/efr32bg22_prs_signals.h \
  C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\Device\SiliconLabs\EFR32BG22\Include/efr32bg22_dma_descriptor.h \
  C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\Device\SiliconLabs\EFR32BG22\Include/efr32bg22_ldmaxbar_defines.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\halconfig\inc\hal-config/hal-config-types.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_gpio.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_bus.h \
  C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_assert.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/hal-config-app-common.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/gecko_configuration.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_gattdb_def.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_types.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_errorcodes.h \
- ../gatt_db.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_gattdb_def.h \
- ../app.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\hardware\kit\common\drivers/retargetserial.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\hardware\kit\common\halconfig/retargetserialhalconfig.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_cmu.h \
+ C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_bus.h \
  C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_gpio.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_common.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_prs.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_ldma.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_timer.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emdrv\dmadrv\inc/dmadrv.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emdrv\common\inc/ecode.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/dmadrv_config.h \
- C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emdrv\gpiointerrupt\inc/gpiointerrupt.h \
- ../simple_dsp.h
+ C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_common.h
 
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_types.h:
+../simple_dsp.h:
 
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\soc/native_gecko.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/hal-config.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/board_features.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/ble-configuration.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\hardware\kit\EFR32BG22_BRD4184A\config/hal-config-board.h:
+C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_cmu.h:
 
 C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\Device\SiliconLabs\EFR32BG22\Include/em_device.h:
 
@@ -211,52 +177,10 @@ C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\Device\Sil
 
 C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\Device\SiliconLabs\EFR32BG22\Include/efr32bg22_ldmaxbar_defines.h:
 
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\halconfig\inc\hal-config/hal-config-types.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_gpio.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_bus.h:
-
 C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_assert.h:
 
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/hal-config-app-common.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/gecko_configuration.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_gattdb_def.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_types.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_errorcodes.h:
-
-../gatt_db.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\protocol\bluetooth\ble_stack\inc\common/bg_gattdb_def.h:
-
-../app.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\hardware\kit\common\drivers/retargetserial.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\hardware\kit\common\halconfig/retargetserialhalconfig.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_cmu.h:
+C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_bus.h:
 
 C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_gpio.h:
 
 C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_common.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_prs.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_ldma.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emlib\inc/em_timer.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emdrv\dmadrv\inc/dmadrv.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emdrv\common\inc/ecode.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound/dmadrv_config.h:
-
-C:\Users\Will\SimplicityStudio\v4_workspace\bluetooth-usound\platform\emdrv\gpiointerrupt\inc/gpiointerrupt.h:
-
-../simple_dsp.h:
