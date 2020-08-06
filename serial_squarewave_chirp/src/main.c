@@ -16,8 +16,8 @@ void initCMU(void)
   CMU_ClockEnable(cmuClock_PRS, true);
   CMU_ClockEnable(cmuClock_PDM, true);
   CMU_ClockSelectSet(cmuClock_PDM, cmuSelect_HFRCODPLL);
-  CMU_ClockEnable(cmuClock_TIMER0, true);
-  CMU_ClockSelectSet(cmuClock_TIMER0, cmuSelect_HFRCODPLL);
+  CMU_ClockEnable(TIMER_PDM_CLK, true);
+  CMU_ClockSelectSet(TIMER_PDM_CLK, cmuSelect_HFRCODPLL);
   CMU_ClockEnable(cmuClock_RTCC, true);
   CMU_ClockSelectSet(cmuClock_RTCC, cmuSelect_LFRCO);
 }

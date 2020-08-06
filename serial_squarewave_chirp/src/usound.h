@@ -22,6 +22,7 @@ void setupChirp();
 void initTIMER(void);
 void initPDM(void);
 void initLDMA(void);
+void initUSound(void);
 void startLDMA_PDM(void);
 void startLDMA_TIMER(void);
 void listen();
