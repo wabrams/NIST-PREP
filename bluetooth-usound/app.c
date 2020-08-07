@@ -40,14 +40,17 @@
 #define TX_OBS_PRS_CHANNEL   1
 
 #define TM_BUFFER_SIZE     256    /**< Size of Buffer for TIMER COMP and TOPV values **/
-#define LR_BUFFER_SIZE     1024    /**< Size of Buffer for Left and Right PDM arrays  **/
-#define PP_BUFFER_SIZE     128    /**< Size of Buffer for Ping and Pong LDMA arrays  **/
+#define LR_BUFFER_SIZE     1024   /**< Size of Buffer for Left and Right PDM arrays  **/
+#define PP_BUFFER_SIZE     256    /**< Size of Buffer for Ping and Pong LDMA arrays  **/
 
 #define PWM_FREQ 10000
 
+bool usound_spk = false;                                /**<  **/
+bool usound_lst = false;                                /**<  **/
+
 uint16_t list_top[TM_BUFFER_SIZE];
 uint16_t list_pwm[TM_BUFFER_SIZE];
-int numWaves = TM_BUFFER_SIZE; //TODO: this should resize, once we add the DSP code
+int numWaves;
 
 int16_t left [LR_BUFFER_SIZE];
 int16_t right[LR_BUFFER_SIZE];
@@ -55,12 +58,13 @@ int offset = 0;
 
 uint32_t pingBuffer[PP_BUFFER_SIZE];
 uint32_t pongBuffer[PP_BUFFER_SIZE];
-bool prevBufferPing = false;
+bool prevBufferPing;
 
 uint32_t timerFreq;
 
 unsigned int channelTMR_TOPV, channelTMR_COMP, channelPDM;
 
+void startDMADRV_PDM(void);
 void startDMADRV_TMR(void);
 
 static inline void printLR()
@@ -85,10 +89,8 @@ void button0Callback(uint8_t pin)
   if (offset == LR_BUFFER_SIZE)
   {
     printLR();
-    offset = 0;
+    usound_lst = usound_spk = true;
   }
-  startDMADRV_TMR();
-  TIMER_Enable(TIMER1, true);
 }
 
 void initGPIO(void)
@@ -122,11 +124,10 @@ void initCMU(void)
   CMU_ClockEnable(cmuClock_PDM, true);
 }
 
-
 void populateBuffers(void)
 {
   int freq_start = 20000;
-  int freq_stop  = 30000;
+  int freq_stop  = 20000;
   float pulse_width = 5e-3;
   calculate_periods_list(freq_start, freq_stop, pulse_width, list_top, &numWaves);
   for (uint32_t i = 0; i < numWaves; i++)
@@ -147,8 +148,6 @@ void initTIMER(void)
 
   // Set top value to overflow at the desired PWM_FREQ frequency
   timerFreq = CMU_ClockFreqGet(cmuClock_TIMER1);
-  // Trigger DMA on compare event to set CCVB to update duty cycle on next period
-  TIMER_IntEnable(TIMER1, TIMER_IEN_CC0);
 }
 
 void initPDM(void)
@@ -174,14 +173,21 @@ void dma_tmr_topv_cb(unsigned int channel, unsigned int sequenceNo, void *userPa
 
 void dma_tmr_comp_cb(unsigned int channel, unsigned int sequenceNo, void *userParam)
 {
-  printLog("tmr_comp_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
   TIMER_Enable(TIMER1, false);
+  startDMADRV_TMR();
+  printLog("tmr_comp_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
 }
 
 void dma_pdm_cb(unsigned int channel, unsigned int sequenceNo, void * userParam)
 {
+  startDMADRV_PDM();
   prevBufferPing = !prevBufferPing;
-  if (offset < LR_BUFFER_SIZE)
+  if (usound_lst)
+  {
+    usound_lst = false;
+    offset = 0;
+  }
+  else if (offset < LR_BUFFER_SIZE)
   { //i had to move this inside the if, otherwise it floods the serial terminal
     printLog("pdm_cb: channel %d, sequenceNo %d\r\n", channelPDM, sequenceNo);
     if (prevBufferPing)
@@ -200,6 +206,11 @@ void dma_pdm_cb(unsigned int channel, unsigned int sequenceNo, void * userParam)
     }
     offset += PP_BUFFER_SIZE;
   }
+  if (usound_spk) //TODO: move to optimal place
+  {
+    usound_spk = false;
+    TIMER_Enable(TIMER1, true);
+  }
 }
 
 void startDMADRV_TMR(void)
@@ -216,6 +227,7 @@ void startDMADRV_PDM(void)
 {
   DMADRV_PeripheralMemoryPingPong(channelPDM, dmadrvPeripheralSignal_PDM_RXDATAV, pingBuffer, pongBuffer,
       &(PDM->RXDATA), true, PP_BUFFER_SIZE, dmadrvDataSize4, dma_pdm_cb, NULL);
+  prevBufferPing = false;
 }
 
 void enableDebugGpios(GPIO_Port_TypeDef rx_obs_port, uint8_t rx_obs_pin, GPIO_Port_TypeDef tx_obs_port, uint8_t tx_obs_pin)
