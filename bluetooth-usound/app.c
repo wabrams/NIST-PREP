@@ -41,7 +41,7 @@
 
 #define TM_BUFFER_SIZE     256    /**< Size of Buffer for TIMER COMP and TOPV values **/
 #define LR_BUFFER_SIZE     1024   /**< Size of Buffer for Left and Right PDM arrays  **/
-#define PP_BUFFER_SIZE     256    /**< Size of Buffer for Ping and Pong LDMA arrays  **/
+#define PP_BUFFER_SIZE     128    /**< Size of Buffer for Ping and Pong LDMA arrays  **/
 
 #define PWM_FREQ 10000
 
@@ -145,6 +145,7 @@ void initTIMER(void)
   TIMER_InitCC_TypeDef timerCCInit = TIMER_INITCC_DEFAULT;
     timerCCInit.mode = timerCCModePWM;
   TIMER_InitCC(TIMER1, 0, &timerCCInit);
+  //TODO: listen to PRS
 
   // Set top value to overflow at the desired PWM_FREQ frequency
   timerFreq = CMU_ClockFreqGet(cmuClock_TIMER1);

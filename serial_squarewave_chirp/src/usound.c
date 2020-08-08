@@ -93,10 +93,10 @@ void setupChirp()
 void initTIMER(void)
 {
   TIMER_Init_TypeDef timerInit = TIMER_INIT_DEFAULT;
-  timerInit.prescale = TIMER_PDM_PRESCALE;
-  timerInit.enable = false;
-  timerInit.debugRun = false;
-  timerInit.fallAction = timerInputActionReloadStart;
+    timerInit.prescale = TIMER_PDM_PRESCALE;
+    timerInit.enable = false;
+    timerInit.debugRun = false;
+    timerInit.fallAction = timerInputActionReloadStart;
   TIMER_Init(TIMER_PDM, &timerInit);
 
   TIMER_InitCC_TypeDef timerCC0Init = TIMER_INITCC_DEFAULT;
@@ -108,7 +108,7 @@ void initTIMER(void)
   TIMER_InitCC(TIMER_PDM, 0, &timerCC0Init);
 
   TIMER_InitCC_TypeDef timerCC1Init = TIMER_INITCC_DEFAULT;
-  timerCC1Init.mode = timerCCModePWM;
+    timerCC1Init.mode = timerCCModePWM;
   TIMER_InitCC(TIMER_PDM, 1, &timerCC1Init);
 
   timerFreq = CMU_ClockFreqGet(TIMER_PDM_CLK) / (TIMER_PDM_PRESCALE + 1);

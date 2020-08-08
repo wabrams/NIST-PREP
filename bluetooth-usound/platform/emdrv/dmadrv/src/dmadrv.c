@@ -1146,9 +1146,9 @@ static Ecode_t StartTransfer(DmaMode_t             mode,
                              unsigned int          channelId,
                              DMADRV_PeripheralSignal_t
                              peripheralSignal,
-                             void                  *buf0,
-                             void                  *buf1,
-                             void                  *buf2,
+                             void                  *buf0, //dst0
+                             void                  *buf1, //dst1
+                             void                  *buf2, //src
                              bool                  bufInc,
                              int                   len,
                              DMADRV_DataSize_t     size,
@@ -1197,7 +1197,8 @@ static Ecode_t StartTransfer(DmaMode_t             mode,
   desc->xfer.srcAddr = (uint32_t)(uint8_t *)buf1;
   desc->xfer.size    = size;
 
-  if ( mode == dmaModePingPong ) {
+  if ( mode == dmaModePingPong )
+  {
     desc->xfer.linkMode = ldmaLinkModeRel;
     desc->xfer.link     = 1;
     desc->xfer.linkAddr = 4;      /* Refer to the "pong" descriptor. */

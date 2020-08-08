@@ -286,7 +286,7 @@ void LDMA_StartTransfer(int ch,
                      | (transfer->ldmaCfgSrcIncSign << _LDMA_CH_CFG_SRCINCSIGN_SHIFT)
                      | (transfer->ldmaCfgDstIncSign << _LDMA_CH_CFG_DSTINCSIGN_SHIFT);
 
-  /* Set the descriptor address. */
+  /* Set the descriptor address. */ //TODO: this is wrong -W
   LDMA->CH[ch].LINK = (uint32_t)descriptor & _LDMA_CH_LINK_LINKADDR_MASK;
 
   /* Clear the pending channel interrupt. */
