@@ -101,18 +101,15 @@ void startDMADRV_TMR(void)
   static LDMA_Descriptor_t descLinkTOPV[2];
   static LDMA_Descriptor_t descLinkCOMP[2];
   static bool need_setup = true;
-
-  LDMA_TransferCfg_t transfercfgTOPV = (LDMA_TransferCfg_t )
-          LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER1_UFOF);
-  LDMA_TransferCfg_t transfercfgCOMP = (LDMA_TransferCfg_t )
-          LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER1_CC1);
+  LDMA_TransferCfg_t transfercfgTOPV = (LDMA_TransferCfg_t) LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER1_UFOF);
+  LDMA_TransferCfg_t transfercfgCOMP = (LDMA_TransferCfg_t) LDMA_TRANSFER_CFG_PERIPHERAL(ldmaPeripheralSignal_TIMER1_CC1);
 
   if (need_setup)
   {
-    descLinkTOPV[0] = (LDMA_Descriptor_t ) LDMA_DESCRIPTOR_LINKREL_M2P_HALFWORD(ping_top, &(TIMER1 -> TOPB), PPS_BUFFER_SIZE, +1);
-    descLinkTOPV[1] = (LDMA_Descriptor_t ) LDMA_DESCRIPTOR_LINKREL_M2P_HALFWORD(pong_top, &(TIMER1 -> TOPB), PPS_BUFFER_SIZE, -1);
-    descLinkCOMP[0] = (LDMA_Descriptor_t ) LDMA_DESCRIPTOR_LINKREL_M2P_HALFWORD(ping_pwm, &(TIMER1 -> CC[1].OCB), PPS_BUFFER_SIZE, +1);
-    descLinkCOMP[1] = (LDMA_Descriptor_t ) LDMA_DESCRIPTOR_LINKREL_M2P_HALFWORD(pong_pwm, &(TIMER1 -> CC[1].OCB), PPS_BUFFER_SIZE, -1);
+    descLinkTOPV[0] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_M2P_HALFWORD(ping_top, &(TIMER1 -> TOPB), PPS_BUFFER_SIZE, +1);
+    descLinkTOPV[1] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_M2P_HALFWORD(pong_top, &(TIMER1 -> TOPB), PPS_BUFFER_SIZE, -1);
+    descLinkCOMP[0] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_M2P_HALFWORD(ping_pwm, &(TIMER1 -> CC[1].OCB), PPS_BUFFER_SIZE, +1);
+    descLinkCOMP[1] = (LDMA_Descriptor_t) LDMA_DESCRIPTOR_LINKREL_M2P_HALFWORD(pong_pwm, &(TIMER1 -> CC[1].OCB), PPS_BUFFER_SIZE, -1);
     need_setup = false;
   }
 
