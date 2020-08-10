@@ -30,254 +30,120 @@
 #include "em_gpio.h"
 #include "em_device.h"
 #include "em_ldma.h"
-#include "em_timer.h"
 #include "dmadrv.h"
 
+#include "em_timer.h"
+#include "em_rtcc.h"
+
 #include "gpiointerrupt.h"
-#include "simple_dsp.h"
 
-#define RX_OBS_PRS_CHANNEL   0
-#define TX_OBS_PRS_CHANNEL   1
+#include "ultrasound/microphone.h"
+#include "ultrasound/speaker.h"
 
-#define TM_BUFFER_SIZE     256    /**< Size of Buffer for TIMER COMP and TOPV values **/
-#define LR_BUFFER_SIZE     1024   /**< Size of Buffer for Left and Right PDM arrays  **/
-#define PP_BUFFER_SIZE     128    /**< Size of Buffer for Ping and Pong LDMA arrays  **/
+static uint8 _conn_handle = 0xFF;
 
-#define PWM_FREQ 10000
+uint8 adv_data[9] = {0x02, 0x01, 0x06, 0x05, 'h', 'e', 'l', 'l', 'o'};
+uint8 scan_resp_data[9] = {0x02, 0x01, 0x06, 0x05, 'w', 'o', 'r', 'l', 'd'};
 
-bool usound_spk = false;                                /**<  **/
-bool usound_lst = false;                                /**<  **/
-
-uint16_t list_top[TM_BUFFER_SIZE];
-uint16_t list_pwm[TM_BUFFER_SIZE];
-int numWaves;
-
-int16_t left [LR_BUFFER_SIZE];
-int16_t right[LR_BUFFER_SIZE];
-int offset = 0;
-
-uint32_t pingBuffer[PP_BUFFER_SIZE];
-uint32_t pongBuffer[PP_BUFFER_SIZE];
-bool prevBufferPing;
-
-uint32_t timerFreq;
-
-unsigned int channelTMR_TOPV, channelTMR_COMP, channelPDM;
-
-void startDMADRV_PDM(void);
-void startDMADRV_TMR(void);
-
-static inline void printLR()
+void bin(uint8_t n)
 {
-  printf("left\r\n");
-  for (int i = 0; i < LR_BUFFER_SIZE; i++)
-  {
-    printf("%d ", left[i]);
-  }
-  printf("\r\n");
-  printf("right\r\n");
-  for (int i = 0; i < LR_BUFFER_SIZE; i++)
-  {
-    printf("%d ", right[i]);
-  }
-  printf("\r\n");
+  uint8_t i;
+  for (i = 1 << 7; i > 0; i = i >> 1)
+    (n & i) ? printLog("1") : printLog("0");
 }
 
-void button0Callback(uint8_t pin)
+void print_mac(bd_addr addr)
 {
-  printf("Button callback\r\n");
-  if (offset == LR_BUFFER_SIZE)
+  for (int i = 0; i < 5; i++)
   {
-    printLR();
-    usound_lst = usound_spk = true;
+    printLog("%02x:", addr.addr[5 - i]);
+  }
+  printLog("%02x", addr.addr[0]);
+}
+
+void print_data(uint8array * data)
+{
+  printLog("0x");
+  for (int i = 0; i < data->len; i++)
+  {
+//    printLog("%c", data->data[i]);
+    printLog("%02x", data->data[i]);
   }
 }
 
-void initGPIO(void)
+#define ADV_HANDLE 0
+void startAdvertising(uint32 interval)
 {
-  GPIO_PinModeSet(gpioPortD, 3, gpioModePushPull, 0); // SPKR_PIN
-  // Button stuff
-  GPIO_PinModeSet(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN, gpioModeInputPullFilter, 1);
-  GPIOINT_Init();
-  printLog("initgpio setup callback\r\n");
-  GPIOINT_CallbackRegister(BSP_BUTTON0_PIN, button0Callback);
-  GPIO_ExtIntConfig(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN, BSP_BUTTON0_PIN, false,
-  true, true);
-  // PDM stuff
-  GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 1);     // MIC_EN
-  GPIO_PinModeSet(gpioPortC, 6, gpioModePushPull, 0);     // PDM_CLK
-  GPIO_PinModeSet(gpioPortC, 7, gpioModeInput,    0);     // PDM_DATA
-  GPIO_SlewrateSet(gpioPortC, 7, 7);
-  GPIO->PDMROUTE.ROUTEEN = GPIO_PDM_ROUTEEN_CLKPEN;
-  GPIO->PDMROUTE.CLKROUTE  = (gpioPortC << _GPIO_PDM_CLKROUTE_PORT_SHIFT)  | (6 << _GPIO_PDM_CLKROUTE_PIN_SHIFT);
-  GPIO->PDMROUTE.DAT0ROUTE = (gpioPortC << _GPIO_PDM_DAT0ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT0ROUTE_PIN_SHIFT);
-  GPIO->PDMROUTE.DAT1ROUTE = (gpioPortC << _GPIO_PDM_DAT1ROUTE_PORT_SHIFT) | (7 << _GPIO_PDM_DAT1ROUTE_PIN_SHIFT);
-  // PWM STUFF
-  GPIO->TIMERROUTE[1].ROUTEEN = GPIO_TIMER_ROUTEEN_CC0PEN;
-  GPIO->TIMERROUTE[1].CC0ROUTE = (gpioPortD << _GPIO_TIMER_CC0ROUTE_PORT_SHIFT) | (3 << _GPIO_TIMER_CC0ROUTE_PIN_SHIFT);
+  uint16_t ret = 0;
+  gecko_cmd_le_gap_set_advertise_timing(ADV_HANDLE, interval, interval, 0, 0);
+  // request event when scan request made
+  gecko_cmd_le_gap_set_advertise_report_scan_request(ADV_HANDLE, 1);
+  ret = gecko_cmd_le_gap_bt5_set_adv_data(ADV_HANDLE, 0, 9, adv_data)->result;
+  printLog("set adv msg: %d\r\n", ret);
+  ret = gecko_cmd_le_gap_bt5_set_adv_data(ADV_HANDLE, 1, 9, scan_resp_data)->result;
+  printLog("set scan response msg: %d\r\n", ret);
+  /* Start general advertising and enable connections. */
+
+  /*
+   gecko_cmd_le_gap_start_advertising(0, le_gap_general_discoverable,
+   le_gap_undirected_connectable);
+   */
+  gecko_cmd_le_gap_start_advertising(ADV_HANDLE, le_gap_user_data, le_gap_scannable_non_connectable);
 }
 
-void initCMU(void)
+void startObserving(uint16_t interval, uint16_t window)
 {
-  CMU_ClockEnable(cmuClock_GPIO, true);
-  CMU_ClockEnable(cmuClock_TIMER1, true);
-  CMU_ClockEnable(cmuClock_PDM, true);
+  gecko_cmd_le_gap_end_procedure();
+  /*  Start observing
+   * Use  extended to get channel info as well
+   */
+  gecko_cmd_le_gap_set_discovery_extended_scan_response(true);
+  /* scan on 1M PHY at 200 ms scan window/interval*/
+  gecko_cmd_le_gap_set_discovery_timing(le_gap_phy_1m, interval, window);
+  /* passive scanning = 0, no scan response sent, active scanning = 1, request more info */
+  gecko_cmd_le_gap_set_discovery_type(le_gap_phy_1m, 1);
+  /* discover all devices on 1M PHY*/
+  gecko_cmd_le_gap_start_discovery(le_gap_phy_1m, le_gap_discover_generic);
 }
-
-void populateBuffers(void)
+static int process_scan(struct gecko_msg_le_gap_extended_scan_response_evt_t *pResp)
 {
-  int freq_start = 20000;
-  int freq_stop  = 20000;
-  float pulse_width = 5e-3;
-  calculate_periods_list(freq_start, freq_stop, pulse_width, list_top, &numWaves);
-  for (uint32_t i = 0; i < numWaves; i++)
+  if (pResp->address.addr[5] == 0x58)
   {
-    list_pwm[i] = list_top[i] * 0.5;
-  }
-}
-
-void initTIMER(void)
-{
-  TIMER_Init_TypeDef timerInit = TIMER_INIT_DEFAULT;
-    timerInit.enable = false;
-  TIMER_Init(TIMER1, &timerInit);
-
-  TIMER_InitCC_TypeDef timerCCInit = TIMER_INITCC_DEFAULT;
-    timerCCInit.mode = timerCCModePWM;
-  TIMER_InitCC(TIMER1, 0, &timerCCInit);
-  //TODO: listen to PRS
-
-  // Set top value to overflow at the desired PWM_FREQ frequency
-  timerFreq = CMU_ClockFreqGet(cmuClock_TIMER1);
-}
-
-void initPDM(void)
-{
-  PDM -> CFG0 = PDM_CFG0_STEREOMODECH01_CH01ENABLE | PDM_CFG0_CH0CLKPOL_NORMAL
-            | PDM_CFG0_CH1CLKPOL_INVERT | PDM_CFG0_FIFODVL_FOUR
-            | PDM_CFG0_DATAFORMAT_DOUBLE16 | PDM_CFG0_NUMCH_TWO
-            | PDM_CFG0_FORDER_FIFTH;
-  PDM -> CFG1 = (5 << _PDM_CFG1_PRESC_SHIFT);
-  PDM -> EN = PDM_EN_EN;
-  while (PDM -> SYNCBUSY);
-  PDM -> CMD = PDM_CMD_START;
-  while (PDM -> SYNCBUSY);
-  PDM -> CTRL = (8 << _PDM_CTRL_GAIN_SHIFT) | (32 << _PDM_CTRL_DSR_SHIFT);
-}
-
-
-void dma_tmr_topv_cb(unsigned int channel, unsigned int sequenceNo, void *userParam)
-{
-  printLog("tmr_topv_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
-//  TIMER_Enable(TIMER1, false);
-}
-
-void dma_tmr_comp_cb(unsigned int channel, unsigned int sequenceNo, void *userParam)
-{
-  TIMER_Enable(TIMER1, false);
-  startDMADRV_TMR();
-  printLog("tmr_comp_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
-}
-
-void dma_pdm_cb(unsigned int channel, unsigned int sequenceNo, void * userParam)
-{
-  startDMADRV_PDM();
-  prevBufferPing = !prevBufferPing;
-  if (usound_lst)
-  {
-    usound_lst = false;
-    offset = 0;
-  }
-  else if (offset < LR_BUFFER_SIZE)
-  { //i had to move this inside the if, otherwise it floods the serial terminal
-    printLog("pdm_cb: channel %d, sequenceNo %d\r\n", channelPDM, sequenceNo);
-    if (prevBufferPing)
+    if (pResp->packet_type & 0x4) //request
     {
-      for (int i = 0; i < PP_BUFFER_SIZE; i++) {
-        left[i + offset] = pingBuffer[i] & 0x0000FFFF;
-        right[i + offset] = (pingBuffer[i] >> 16) & 0x0000FFFF;
-      }
+// //USEFUL: for printing out BT Packet Info
+//      uint8_t channel = pResp->channel;
+//      int8_t rssi = pResp->rssi;
+//      print_mac(pResp->address);
+//      printLog(", type: ");
+//      bin(pResp->packet_type);
+//      printLog(", ch:%d, rssi:%d, ", channel, rssi);
+//      printLog("data len: %2d, data:", pResp->data.len);
+//      print_data(&(pResp->data));
+//      printLog("\r\n");
+
+      printLog("MICROPHONE\r\n");
+      // start microphone
+      recording = true;
+      startLDMA_PDM();
     }
-    else
-    {
-      for (int i = 0; i < PP_BUFFER_SIZE; i++) {
-        left[offset + i] = pongBuffer[i] & 0x0000FFFF;
-        right[offset + i] = (pongBuffer[i] >> 16) & 0x0000FFFF;
-      }
-    }
-    offset += PP_BUFFER_SIZE;
   }
-  if (usound_spk) //TODO: move to optimal place
-  {
-    usound_spk = false;
-    TIMER_Enable(TIMER1, true);
-  }
+  /*  TODO: Work in progress end */
+  return 0;
 }
 
-void startDMADRV_TMR(void)
+void init_dma_channels(void)
 {
-  //TOPV
-  DMADRV_MemoryPeripheral(channelTMR_TOPV, dmadrvPeripheralSignal_TIMER1_UFOF, &TIMER1 -> TOPB,
-      list_top, true, numWaves, dmadrvDataSize2, dma_tmr_topv_cb, NULL);
-  //COMP
-  DMADRV_MemoryPeripheral(channelTMR_COMP, dmadrvPeripheralSignal_TIMER1_CC0, &TIMER1->CC[0].OCB,
-      list_pwm, true, numWaves, dmadrvDataSize2, dma_tmr_comp_cb, NULL);
+  uint32_t e0 = DMADRV_AllocateChannel(&ldma_channelTMR_TOPV, NULL);
+  printLog("DMADRV channel %d, retcode: %lu\r\n", ldma_channelTMR_TOPV, e0);
+  uint32_t e1 = DMADRV_AllocateChannel(&ldma_channelTMR_COMP, NULL);
+  printLog("DMADRV channel %d, retcode: %lu\r\n", ldma_channelTMR_COMP, e1);
+  uint32_t e2 = DMADRV_AllocateChannel(&ldma_channelPDM, NULL);
+  printLog("DMADRV channel %d, retcode: %lu\r\n", ldma_channelPDM, e2);
 }
 
-void startDMADRV_PDM(void)
-{
-  DMADRV_PeripheralMemoryPingPong(channelPDM, dmadrvPeripheralSignal_PDM_RXDATAV, pingBuffer, pongBuffer,
-      &(PDM->RXDATA), true, PP_BUFFER_SIZE, dmadrvDataSize4, dma_pdm_cb, NULL);
-  prevBufferPing = false;
-}
-
-void enableDebugGpios(GPIO_Port_TypeDef rx_obs_port, uint8_t rx_obs_pin, GPIO_Port_TypeDef tx_obs_port, uint8_t tx_obs_pin)
-{
-  // Turn on the PRS and GPIO clocks to access their registers.
-  // Configure pins as output.
-  GPIO_PinModeSet(rx_obs_port, rx_obs_pin, gpioModePushPull, 0);
-  GPIO_PinModeSet(tx_obs_port, tx_obs_pin, gpioModePushPull, 0);
-
-#ifdef _SILICON_LABS_32B_SERIES_2
-
-  // Configure PRS Channel 0 to output RAC_RX.
-  PRS_SourceAsyncSignalSet(0, PRS_ASYNC_CH_CTRL_SOURCESEL_RACL,
-  _PRS_ASYNC_CH_CTRL_SIGSEL_RACLRX);
-  PRS_PinOutput(RX_OBS_PRS_CHANNEL, prsTypeAsync, rx_obs_port, rx_obs_pin);
-
-  /* Configure PRS Channel 0 to output RAC_RX.*/
-  PRS_SourceAsyncSignalSet(1, PRS_ASYNC_CH_CTRL_SOURCESEL_RACL,
-  _PRS_ASYNC_CH_CTRL_SIGSEL_RACLTX);
-  PRS_PinOutput(TX_OBS_PRS_CHANNEL, prsTypeAsync, tx_obs_port, tx_obs_pin);
-#elif defined(_SILICON_LABS_32B_SERIES_1)
-  if((tx_obs_port != gpioPortF)||(rx_obs_port != gpioPortF))
-  {
-    return;
-  }
-  if(rx_obs_port == gpioPortF)
-  {
-    ch0_loc = rx_obs_pin;
-  }
-
-  /*set the radio RX active to channel 0*/
-  PRS_SourceAsyncSignalSet(RX_OBS_PRS_CHANNEL,
-      PRS_RAC_RX,
-      ((PRS_RAC_RX & _PRS_CH_CTRL_SIGSEL_MASK)>> _PRS_CH_CTRL_SIGSEL_SHIFT));
-  /* set the location for channel0 and enable it*/
-  PRS_GpioOutputLocation(RX_OBS_PRS_CHANNEL,/*ch0_loc*/rx_obs_pin);
-
-  /*set radio Tx active to channel 1.
-   * channel 1. Locations can be 0 - 7*/
-  PRS_SourceAsyncSignalSet(TX_OBS_PRS_CHANNEL,
-      (PRS_RAC_RX & _PRS_CH_CTRL_SOURCESEL_MASK),
-      ((PRS_RAC_RX & _PRS_CH_CTRL_SIGSEL_MASK)>> _PRS_CH_CTRL_SIGSEL_SHIFT));
-
-  /*for series 1 PRS channel 1 can only be output on port F so the pin number minus 1 equates to the location*/
-  PRS_GpioOutputLocation(TX_OBS_PRS_CHANNEL,tx_obs_pin-1);
-#endif
-}
 /* Print boot message */
-static void bootMessage(struct gecko_msg_system_boot_evt_t * bootevt);
+static void bootMessage(struct gecko_msg_system_boot_evt_t *bootevt);
 
 /* Flag for indicating DFU Reset must be performed */
 static uint8_t boot_to_dfu = 0;
@@ -288,16 +154,13 @@ void appMain(gecko_configuration_t *pconfig)
 #if DISABLE_SLEEP > 0
   pconfig->sleep.flags = 0;
 #endif
-
   /* Initialize debug prints. Note: debug prints are off by default. See DEBUG_LEVEL in app.h */
   initLog();
-  initGPIO();
-  initCMU();
+  init_speaker();
   initTIMER();
+  // init_prs();
   initPDM();
-
-  // Initialize DMA only after buffer is populated
-  populateBuffers();
+  initTimer0();
   DMADRV_Init();
 
   /* Initialize stack */
@@ -306,7 +169,7 @@ void appMain(gecko_configuration_t *pconfig)
   while (1)
   {
     /* Event pointer for handling events */
-    struct gecko_cmd_packet* evt;
+    struct gecko_cmd_packet * evt;
 
     /* if there are no events pending then the next call to gecko_wait_event() may cause
      * device go to deep sleep. Make sure that debug prints are flushed before going to sleep */
@@ -319,91 +182,114 @@ void appMain(gecko_configuration_t *pconfig)
     evt = gecko_wait_event();
 
     /* Handle events */
-    switch (BGLIB_MSG_ID(evt->header))
+    switch (BGLIB_MSG_ID(evt -> header))
     {
-    /* This boot event is generated when the system boots up after reset.
-     * Do not call any stack commands before receiving the boot event.
-     * Here the system is set to start advertising immediately after boot procedure. */
-    case gecko_evt_system_boot_id:
+      case gecko_evt_system_boot_id:
+        gecko_cmd_gatt_set_max_mtu(247);
+        bootMessage(&(evt->data.evt_system_boot));
+        printLog("boot event - starting advertising\r\n");
 
-      bootMessage(&(evt->data.evt_system_boot));
-      printLog("boot event - starting advertising\r\n");
-      //enableDebugGpios(gpioPortB, 0, gpioPortB, 0);
-      /* Set advertising parameters. 100ms advertisement interval.
-       * The first parameter is advertising set handle
-       * The next two parameters are minimum and maximum advertising interval, both in
-       * units of (milliseconds * 1.6).
-       * The last two parameters are duration and maxevents left as default. */
+        init_dma_channels();
+        startDMADRV_TMR();
+        prs_gpio(gpioPortB, 0, gpioPortC, 0);
 
-      uint32_t e0 = DMADRV_AllocateChannel(&channelTMR_TOPV, NULL);
-      printLog("DMADRV channel %d, retcode: %lu\r\n", channelTMR_TOPV, e0);
-      uint32_t e1 = DMADRV_AllocateChannel(&channelTMR_COMP, NULL);
-      printLog("DMADRV channel %d, retcode: %lu\r\n", channelTMR_COMP, e1);
-      uint32_t e2 = DMADRV_AllocateChannel(&channelPDM, NULL);
-      printLog("DMADRV channel %d, retcode: %lu\r\n", channelPDM, e2);
-      startDMADRV_TMR();
-      startDMADRV_PDM();
-      gecko_cmd_le_gap_set_advertise_timing(0, 10 * 160, 10 * 160, 0, 0);
+        startAdvertising(160);
+        startObserving(3200, 320);
+        break;
 
-      /* Start general advertising and enable connections. */
-      gecko_cmd_le_gap_start_advertising(0, le_gap_general_discoverable,
-          le_gap_connectable_scannable);
-      break;
-
-    case gecko_evt_le_connection_opened_id:
-
-      printLog("connection opened\r\n");
-      GPIO_PinModeSet(gpioPortB, 0, gpioModePushPull, 1);
-
-      break;
-
-    case gecko_evt_le_connection_closed_id:
-
-      printLog("connection closed, reason: 0x%2.2x\r\n",
-          evt->data.evt_le_connection_closed.reason);
-      GPIO_PinModeSet(gpioPortB, 0, gpioModePushPull, 0);
-
-      /* Check if need to boot to OTA DFU mode */
-      if (boot_to_dfu)
+      case gecko_evt_le_gap_scan_request_id:
       {
-        /* Enter to OTA DFU mode */
-        gecko_cmd_system_reset(2);
+        /*
+         *  Who made a scan request?   We should now send a chirp
+         */
+        bd_addr scanner_address = evt->data.evt_le_gap_scan_request.address;
+        uint8 address_type = evt->data.evt_le_gap_scan_request.address_type;
+        uint8 bonding = evt->data.evt_le_gap_scan_request.bonding;
+        /*  Work in progress start */
+        //  Need some way to figure out whether this request warrants a speaker chirp
+        //  For now just check the mac address... Need to figure out a better way.
+        if (scanner_address.addr[5] == 0x58)
+        {
+          printLog("*************************scan_request: %d, %d, ", address_type, bonding);
+          print_mac(scanner_address);
+          printLog("\r\n");
+          // TODO: play speaker here
+          printLog("SPEAKER\r\n");
+          TIMER_Enable(TIMER1, true);
+        }
+        /*  Work in progress end */
+
       }
-      else
+        break;
+      case gecko_evt_le_gap_extended_scan_response_id:
       {
-        /* Restart advertising after client has disconnected */
-        gecko_cmd_le_gap_start_advertising(0, le_gap_general_discoverable,
-            le_gap_connectable_scannable);
+        /*
+         *  Heard an advertiser... what were the parameters of the connection
+         */
+        // printLog("scan_response_id %d\r\n", evt->data.evt_le_gap_extended_scan_response.data.len);
+        process_scan(&(evt->data.evt_le_gap_extended_scan_response));
+        break;
       }
-      break;
+      case gecko_evt_le_connection_opened_id:
+        _conn_handle = evt->data.evt_le_connection_opened.connection;
+        printLog("Connected\r\n");
 
-      /* Events related to OTA upgrading
-       ----------------------------------------------------------------------------- */
+        /* Request connection parameter update.
+         * conn.interval min 20ms, max 40ms, slave latency 4 intervals,
+         * supervision timeout 2 seconds
+         * (These should be compliant with Apple Bluetooth Accessory Design Guidelines, both R7 and R8) */
+        gecko_cmd_le_connection_set_timing_parameters(_conn_handle, 24, 40, 0, 200, 0, 0xFFFF);
 
-      /* Check if the user-type OTA Control Characteristic was written.
-       * If ota_control was written, boot the device into Device Firmware Upgrade (DFU) mode. */
-    case gecko_evt_gatt_server_user_write_request_id:
+        printLog("connection opened\r\n");
+        GPIO_PinModeSet(gpioPortB, 0, gpioModePushPull, 1);
 
-      if (evt->data.evt_gatt_server_user_write_request.characteristic
-          == gattdb_ota_control)
-      {
-        /* Set flag to enter to OTA mode */
-        boot_to_dfu = 1;
-        /* Send response to Write Request */
-        gecko_cmd_gatt_server_send_user_write_response(
-            evt->data.evt_gatt_server_user_write_request.connection,
-            gattdb_ota_control, bg_err_success);
+        break;
 
-        /* Close connection to enter to DFU OTA mode */
-        gecko_cmd_le_connection_close(
-            evt->data.evt_gatt_server_user_write_request.connection);
-      }
-      break;
+      case gecko_evt_le_connection_closed_id:
 
-      /* Add additional event handlers as your application requires */
+        printLog("connection closed, reason: 0x%2.2x\r\n",
+            evt->data.evt_le_connection_closed.reason);
+        GPIO_PinModeSet(gpioPortB, 0, gpioModePushPull, 0);
 
-    default:
-      break;
+        /* Check if need to boot to OTA DFU mode */
+        if (boot_to_dfu)
+        {
+          /* Enter to OTA DFU mode */
+          gecko_cmd_system_reset(2);
+        }
+        else
+        {
+          /* Restart advertising after client has disconnected */
+          gecko_cmd_le_gap_start_advertising(0, le_gap_general_discoverable,
+              le_gap_connectable_scannable);
+        }
+        break;
+
+        /* Events related to OTA upgrading
+         ----------------------------------------------------------------------------- */
+
+        /* Check if the user-type OTA Control Characteristic was written.
+         * If ota_control was written, boot the device into Device Firmware Upgrade (DFU) mode. */
+      case gecko_evt_gatt_server_user_write_request_id:
+
+        if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control)
+        {
+          /* Set flag to enter to OTA mode */
+          boot_to_dfu = 1;
+          /* Send response to Write Request */
+          gecko_cmd_gatt_server_send_user_write_response(
+              evt->data.evt_gatt_server_user_write_request.connection,
+              gattdb_ota_control, bg_err_success);
+
+          /* Close connection to enter to DFU OTA mode */
+          gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
+        }
+        break;
+
+        /* Add additional event handlers as your application requires */
+
+      default:
+        break;
     }
   }
 }
@@ -415,8 +301,7 @@ static void bootMessage(struct gecko_msg_system_boot_evt_t *bootevt)
   bd_addr local_addr;
   int i;
 
-  printLog("stack version: %u.%u.%u\r\n", bootevt->major, bootevt->minor,
-      bootevt->patch);
+  printLog("stack version: %u.%u.%u\r\n", bootevt->major, bootevt->minor, bootevt->patch);
   local_addr = gecko_cmd_system_get_bt_address()->address;
 
   printLog("local BT device address: ");

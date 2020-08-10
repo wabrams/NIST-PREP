@@ -29,4 +29,5 @@ platform/emdrv/sleep/src \
 platform/emlib/src \
 platform/service/sleeptimer/src \
 protocol/bluetooth/lib/EFR32BG22/GCC \
+ultrasound \
 
