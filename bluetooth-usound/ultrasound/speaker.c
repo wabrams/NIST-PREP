@@ -82,7 +82,7 @@ void updatePingPongBuffers(void)
 
 bool dma_tmr_topv_cb(unsigned int channel, unsigned int sequenceNo, void * userParam)
 {
-//  TIMER_Enable(TIMER1, false);
+  TIMER_Enable(TIMER1, false);
   printLog("tmr_topv_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
   prevPingTOP = !prevPingTOP;
   return 0;
@@ -90,10 +90,9 @@ bool dma_tmr_topv_cb(unsigned int channel, unsigned int sequenceNo, void * userP
 
 bool dma_tmr_comp_cb(unsigned int channel, unsigned int sequenceNo, void * userParam)
 {
-  TIMER_Enable(TIMER1, false);
+//  TIMER_Enable(TIMER1, false);
   printLog("tmr_comp_cb: channel %d, sequenceNo %d\r\n", channel, sequenceNo);
   prevPingPWM = !prevPingPWM;
-//  startDMADRV_TMR();
   return 0;
 }
 
@@ -153,7 +152,6 @@ void init_speaker(void)
 
   setupChirps();
   setupBuffers();
-  startDMADRV_TMR();
 }
 
 void initTIMER(void)

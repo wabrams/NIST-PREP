@@ -107,7 +107,7 @@ void startObserving(uint16_t interval, uint16_t window)
 }
 static int process_scan(struct gecko_msg_le_gap_extended_scan_response_evt_t *pResp)
 {
-  if (pResp->address.addr[5] == 0x58)
+  if (pResp->address.addr[5] == 0x58 && pResp->address.addr[4] == 0x8e)
   {
     if (pResp->packet_type & 0x4) //request
     {
@@ -122,8 +122,8 @@ static int process_scan(struct gecko_msg_le_gap_extended_scan_response_evt_t *pR
 //      print_data(&(pResp->data));
 //      printLog("\r\n");
 
-      printLog("MICROPHONE\r\n");
-      // start microphone
+      //TODO: start microphone
+      //TODO: needs to be blocking statements
       recording = true;
       startLDMA_PDM();
     }
@@ -135,11 +135,11 @@ static int process_scan(struct gecko_msg_le_gap_extended_scan_response_evt_t *pR
 void init_dma_channels(void)
 {
   uint32_t e0 = DMADRV_AllocateChannel(&ldma_channelTMR_TOPV, NULL);
-  printLog("DMADRV channel %d, retcode: %lu\r\n", ldma_channelTMR_TOPV, e0);
+  printLog("DMADRV: TOP CH%d, retcode: %lu\r\n", ldma_channelTMR_TOPV, e0);
   uint32_t e1 = DMADRV_AllocateChannel(&ldma_channelTMR_COMP, NULL);
-  printLog("DMADRV channel %d, retcode: %lu\r\n", ldma_channelTMR_COMP, e1);
+  printLog("DMADRV: PWM CH%d, retcode: %lu\r\n", ldma_channelTMR_COMP, e1);
   uint32_t e2 = DMADRV_AllocateChannel(&ldma_channelPDM, NULL);
-  printLog("DMADRV channel %d, retcode: %lu\r\n", ldma_channelPDM, e2);
+  printLog("DMADRV: PDM CH%d, retcode: %lu\r\n", ldma_channelPDM, e2);
 }
 
 /* Print boot message */
@@ -208,13 +208,13 @@ void appMain(gecko_configuration_t *pconfig)
         /*  Work in progress start */
         //  Need some way to figure out whether this request warrants a speaker chirp
         //  For now just check the mac address... Need to figure out a better way.
-        if (scanner_address.addr[5] == 0x58)
+        if (scanner_address.addr[5] == 0x58 && scanner_address.addr[4] == 0x8e)
         {
           printLog("*************************scan_request: %d, %d, ", address_type, bonding);
           print_mac(scanner_address);
           printLog("\r\n");
           // TODO: play speaker here
-          printLog("SPEAKER\r\n");
+          //TODO: needs to be blocking somehow. maybe set a bool for busy and wait on it
           TIMER_Enable(TIMER1, true);
         }
         /*  Work in progress end */
